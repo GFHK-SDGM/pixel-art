@@ -29,6 +29,10 @@
   position: relative;
   display: inline-block;
   cursor: pointer;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 .popup .popuptext {
@@ -76,7 +80,7 @@
 </head>
 <body>
 <div style="display: flex; flex-direction: column; align-items: center;">
-  <input type="file" id="uploadInput">
+  <input type="file" id="uploadInput" accept="image/*">
   <div>
     <label for="max-width">Max. width:</label>
     <input type="text" id="max-width" value="40">
@@ -87,6 +91,16 @@
   </div>
   <button id="captureButton">Take a Photo</button>
   <button id="uploadButton" disabled>Upload Image</button>
+  <div id="errorMessage"></div>
+  <div id="photoContainer"></div>
+  <div>
+    <label for="isQuantized">Quantize the image</label>
+    <input type="checkbox" id="isQuantized" checked>
+  </div>
+  <div>
+    <p>Palette for quantization:</p>
+    <div style="border: 1px solid #ccc;"></div>
+  </div>
   <div>
     <label for="encoded">Encoded String:</label>
     <div id="encoded" style="font-family: monospace;"></div>
@@ -98,8 +112,6 @@
     -->
   </div>
 </div>
-<div id="photoContainer"></div>
-<div id="errorMessage"></div>
 <script>
 "use strict";
 const photoContainer = document.getElementById("photoContainer");
@@ -108,10 +120,12 @@ const errorMessage = document.getElementById("errorMessage");
 let resizedImage = null;
 
 function displayPhoto(photoData) {
-  const photo = new Image();
-  photo.src = photoData;
-  photoContainer.innerHTML = "";
-  photoContainer.appendChild(photo);
+  const img = new Image();
+  img.src = photoData;
+  img.onload = () => {
+    photoContainer.innerHTML = "";
+    photoContainer.appendChild(img);
+  };
 }
 
 function clearErrorMessage() {
@@ -160,7 +174,7 @@ document.getElementById("uploadInput").addEventListener("change", (ev) => {
     reader.onload = function (ev) {
       const photoData = ev.target.result;
       displayPhoto(photoData);
-      resizedImage(photoData);
+      resizeImage(photoData);
       clearErrorMessage(); // Clear any previous error message
       document.getElementById("uploadButton").disabled = false; // Enable the upload button
     };
