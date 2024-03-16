@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+* {
+  font-family: sans-serif;
+}
+
+#photoContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 20px;
+}
+
+#photoContainer img {
+  max-width: 100%;
+  max-height: 400px;
+}
+
+#errorMessage {
+  color: red;
+  font-weight: bold;
+}
+</style>
+</head>
+<body>
+<div style="display: flex; flex-direction: column; align-items: center;">
+<input type="file" id="uploadInput">
+<label for="max-width">Max. width:</label>
+<input type="text" name="max-width" value="40">
+<label for="max-height">Max. height:</label>
+<input type="text" name="max-height" value="40">
+<button id="captureButton">Take a Photo</button>
+<button id="uploadButton" disabled>Upload Image</button>
+</div>
+<div id="photoContainer"></div>
+<div id="errorMessage"></div>
+<script>
+"use strict";
+const photoContainer = document.getElementById("photoContainer");
+const errorMessage = document.getElementById("errorMessage");
+
+let resizedImage = null;
+
+function displayPhoto(photoData) {
+  const photo = new Image();
+  photo.src = photoData;
+  photoContainer.innerHTML = "";
+  photoContainer.appendChild(photo);
+}
+
+function clearErrorMessage() {
+  errorMessage.textContent = "";
+}
+
+function displayErrorMessage(message) {
+  errorMessage.textContent = message;
+}
+
+document.getElementById("max-width").addEventListener("input", (ev) => {
+  if (isNaN(parseInt(ev.target.value))) {
+    displayErrorMessage("Please input a valid number.");
+  } else if (parseInt(ev.target.value) > 1920) {
+    displayErrorMessage("Max. width cannot be larger than 1920 px.");
+  } else {
+    clearErrorMessage();
+  }
+});
+
+document.getElementById("max-height").addEventListener("input", (ev) => {
+  if (isNaN(parseInt(ev.target.value))) {
+    displayErrorMessage("Please input a valid number.");
+  } else if (parseInt(ev.target.value) > 1920) {
+    displayErrorMessage("Max. height cannot be larger than 1920 px.");
+  } else {
+    clearErrorMessage();
+  }
+});
+
+document.getElementById("uploadInput").addEventListener("change", (ev) => {
+  const file = ev.target.files[0];
+  const reader = new FileReader();
+
+  if (file && file.type.match("image.*")) {
+    reader.onload = function (ev) {
+      const photoData = ev.target.result;
+      displayPhoto(photoData);
+      resizeImage(photoData);
+      clearErrorMessage(); // Clear any previous error message
+      document.getElementById("uploadButton").disabled = false; // Enable the upload button
+    };
+
+    reader.readAsDataURL(file);
+  } else {
+    displayErrorMessage("Please select a valid image file.");
+  }
+});
+
+document.getElementById("captureButton").addEventListener("click", () => {
+  navigator.mediaDevices.getUserMedia({video: true})
+    .then(function (stream) {
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      video.onloadedmetadata = function (ev) {
+        video.play();
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+        const photoData = canvas.toDataURL("image/png");
+        displayPhoto(photoData);
+        mediaStream.getTracks().forEach(function (track) {
+          track.stop();
+        });
+      };
+    })
+  .catch(function (err) {
+    console.error("Error accessing camera:", err);
+    displayErrorMessage(err);
+  });
+});
+
+function resizeImage(photoData) {
+  const MAX_WIDTH = document.getElementById("max-width").value;
+  const MAX_HEIGHT = document.getElementById("max-height").value;
+
+  const image = new Image();
+  image.src = photoData;
+
+  image.onload = function () {
+    let width = image.width;
+    let height = image.height;
+
+    if (width > height) {
+      if (width > MAX_WIDTH) {
+        height *= MAX_WIDTH / width;
+        width = MAX_WIDTH;
+      }
+    } else {
+      if (height > MAX_HEIGHT) {
+        width *= MAX_HEIGHT / height;
+        height = MAX_HEIGHT;
+      }
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(image, 0, 0, width, height);
+
+    resizedImage = canvas.toDataURL("image/webp");
+  };
+}
+</script>
+</body>
+</html>
