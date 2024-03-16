@@ -24,17 +24,79 @@
   color: red;
   font-weight: bold;
 }
+
+.popup {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+}
+
+.popup .popuptext {
+  visibility: hidden;
+  width: 160px;
+  background-color: #555;
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 8px 0;
+  position: absolute;
+  z-index: 1;
+  bottom: 125%;
+  left: 50%;
+  margin-left: -80px;
+}
+
+.popup .popuptext::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #555 transparent transparent transparent;
+}
+
+.popup .show {
+  visibility: visible;
+  -webkit-animation: fadeIn 1s;
+  animation: fadeIn 1s
+}
+
+@-webkit-keyframes fadeIn {
+  from {opacity: 0;}
+  to {opacity: 1;}
+}
+
+@keyframes fadeIn {
+  from {opacity: 0;}
+  to {opacity: 1;}
+}
 </style>
 </head>
 <body>
 <div style="display: flex; flex-direction: column; align-items: center;">
-<input type="file" id="uploadInput">
-<label for="max-width">Max. width:</label>
-<input type="text" id="max-width" value="40">
-<label for="max-height">Max. height:</label>
-<input type="text" id="max-height" value="40">
-<button id="captureButton">Take a Photo</button>
-<button id="uploadButton" disabled>Upload Image</button>
+  <input type="file" id="uploadInput">
+  <div>
+    <label for="max-width">Max. width:</label>
+    <input type="text" id="max-width" value="40">
+  </div>
+  <div>
+    <label for="max-height">Max. height:</label>
+    <input type="text" id="max-height" value="40">
+  </div>
+  <button id="captureButton">Take a Photo</button>
+  <button id="uploadButton" disabled>Upload Image</button>
+  <div>
+    <label for="encoded">Encoded String:</label>
+    <div id="encoded" style="font-family: monospace;"></div>
+    <!--
+    <div class="popup">
+      <button id="copyToClipboard">Copy to Clipboard</button>
+      <span class="popuptext" id="copy-popup">String copied!</span>
+    </div>
+    -->
+  </div>
 </div>
 <div id="photoContainer"></div>
 <div id="errorMessage"></div>
@@ -63,20 +125,30 @@ function displayErrorMessage(message) {
 document.getElementById("max-width").addEventListener("input", (ev) => {
   if (isNaN(parseInt(ev.target.value))) {
     displayErrorMessage("Please input a valid number.");
+    document.getElementById("uploadButton").disabled = true;
   } else if (parseInt(ev.target.value) > 1920) {
     displayErrorMessage("Max. width cannot be larger than 1920 px.");
+    document.getElementById("uploadButton").disabled = true;
   } else {
     clearErrorMessage();
+    if (photoContainer.innerHTML != "") {
+      document.getElementById("uploadButton").disabled = false;
+    }
   }
 });
 
 document.getElementById("max-height").addEventListener("input", (ev) => {
   if (isNaN(parseInt(ev.target.value))) {
     displayErrorMessage("Please input a valid number.");
+    document.getElementById("uploadButton").disabled = true;
   } else if (parseInt(ev.target.value) > 1920) {
     displayErrorMessage("Max. height cannot be larger than 1920 px.");
+    document.getElementById("uploadButton").disabled = true;
   } else {
     clearErrorMessage();
+    if (photoContainer.innerHTML != "") {
+      document.getElementById("uploadButton").disabled = false;
+    }
   }
 });
 
@@ -88,11 +160,10 @@ document.getElementById("uploadInput").addEventListener("change", (ev) => {
     reader.onload = function (ev) {
       const photoData = ev.target.result;
       displayPhoto(photoData);
-      resizeImage(photoData);
+      resizedImage(photoData);
       clearErrorMessage(); // Clear any previous error message
       document.getElementById("uploadButton").disabled = false; // Enable the upload button
     };
-
     reader.readAsDataURL(file);
   } else {
     displayErrorMessage("Please select a valid image file.");
@@ -116,6 +187,7 @@ document.getElementById("captureButton").addEventListener("click", () => {
           track.stop();
         });
       };
+      document.getElementById("uploadButton").disabled = false; // Enable the upload button
     })
   .catch(function (err) {
     console.error("Error accessing camera:", err);
@@ -153,6 +225,7 @@ function resizeImage(photoData) {
     ctx.drawImage(image, 0, 0, width, height);
 
     resizedImage = canvas.toDataURL("image/webp");
+    return resizedImage;
   };
 }
 </script>
