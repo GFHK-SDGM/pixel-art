@@ -91,6 +91,7 @@
   </div>
   <button id="captureButton">Take a Photo</button>
   <button id="uploadButton" disabled>Upload Image</button>
+  <button id="render">Render Image</button>
   <div id="errorMessage"></div>
   <div id="photoContainer"></div>
   <div>
@@ -242,6 +243,10 @@ function resizeImage(photoData) {
     return resizedImage;
   };
 }
+
+document.getElementById("render").addEventListener("click", () => {
+  displayPhoto(resizedImage);
+});
 </script>
 </body>
 </html>
