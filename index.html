@@ -16,8 +16,10 @@
 }
 
 #photoContainer img {
+  image-rendering: pixelated;
   max-width: 100%;
   max-height: 400px;
+  transform-origin: top left;
 }
 
 input[type=color] {
@@ -115,7 +117,6 @@ input[type=color] {
   </div>
   <button id="captureButton">Take a Photo</button>
   <button id="uploadButton" disabled>Upload Image</button>
-  <button id="render">Render Image</button>
   <div id="errorMessage"></div>
   <div id="photoContainer"></div>
   <div>
@@ -146,7 +147,6 @@ input[type=color] {
   <div>
     <label for="encoded">Encoded String:</label>
     <div id="encoded" style="font-family: monospace;"></div>
-    
     <div class="popup">
       <button id="copyToClipboard">Copy to Clipboard</button>
       <span class="popuptext" id="copy-popup">String copied!</span>
@@ -155,7 +155,7 @@ input[type=color] {
 </div>
 <script>
 "use strict";
-HTMLImageElement.prototype.ready = function () {
+HTMLImageElement.prototype.ready = async function () {
   return new Promise((resolve, reject) => {
     this.onload = () => {
       resolve();
@@ -165,6 +165,22 @@ HTMLImageElement.prototype.ready = function () {
     };
   });
 };
+
+let zip = function (...arrays) {
+  const minLength = Math.min(...arrays.map(arr => arr.length));
+  return Array.from({ length: minLength }, (_, i) => arrays.map(arr => arr[i]));
+};
+
+let findIndexOfSmallestElement = function (arr) {
+  if (arr.length === 0) {
+    return -1; // Return -1 if the array is empty
+  }
+  const minIndex = arr.reduce((minIndex, currentElement, currentIndex, array) => {
+    return currentElement < array[minIndex] ? currentIndex : minIndex;
+  }, 0);
+  return minIndex;
+};
+
 // (()=>{var s=class extends EventTarget{static sleep(t){return new Promise(e=>{self.AbortSignal?AbortSignal.timeout(t).addEventListener("abort",e):setTimeout(e,t)})}#s;#e;#t=!1;get finished(){return this.#t}finish(){this.#t=!0,this.#e&&this.#e()}wait(){if(!this.#t)return this.#s}constructor(){super(),this.#s=new Promise(t=>{this.#e=()=>{this.#t=!0,t()}})}},i=s;self.miniSignal=i;})();
 </script>
 <script>
@@ -173,12 +189,42 @@ const photoContainer = document.getElementById("photoContainer");
 const errorMessage = document.getElementById("errorMessage");
 
 let blobUrl;
+let encodedString = "";
 
-function displayPhoto(photoData, el = photoContainer) {
+async function displayPhoto(imgData, el = photoContainer) {
   const img = new Image();
-  img.src = photoData;
+  if (typeof imgData == "object") {
+    const cnv = document.createElement("canvas");
+    cnv.width = imgData.width;
+    cnv.height = imgData.height;
+    const ctx = cnv.getContext("2d");
+    ctx.putImageData(imgData, 0, 0);
+    img.src = cnv.toDataURL("image/webp");
+  } else if (typeof imgData == "string") {
+    img.src = imgData;
+  }
   el.innerHTML = "";
   el.appendChild(img);
+
+  await img.ready();
+
+  if (img.width < 50) {
+    img.style.transform = `scale(8) translate(-${img.width >> 1}px, -${img.height >> 1}px)`;
+    el.style.width = `${img.width << 3}px`;
+    el.style.height = `${img.height << 3}px`;
+  } else if (img.width < 100) {
+    img.style.transform = `scale(4) translate(-${img.width >> 1}px, -${img.height >> 1}px)`;
+    el.style.width = `${img.width << 2}px`;
+    el.style.height = `${img.height << 2}px`;
+  } else if (img.width < 200) {
+    img.style.transform = `scale(2) translate(-${img.width >> 1}px, -${img.height >> 1}px)`;
+    el.style.width = `${img.width << 1}px`;
+    el.style.height = `${img.height << 1}px`;
+  } else if (img.width < 400) {
+    // img.style.transform = `scale(2) translate(-${img.width >> 1}px, -${img.height >> 1}px)`;
+    // el.style.width = `${img.width << 1}px`;
+    // el.style.height = `${img.height << 1}px`;
+  }
 }
 
 function clearErrorMessage(el = errorMessage) {
@@ -238,18 +284,24 @@ document.getElementById("uploadInput").addEventListener("change", async (ev) => 
     ctx.drawImage(await createImageBitmap(file), 0, 0);
     let imgData = ctx.getImageData(0, 0, img.width, img.height);
     let resizedImgData = await resizeImage(imgData);
-    console.info(`resizedImgData: ${resizedImgData}`);
-    /*
-      if (document.getElementById("isQuantized").checked) {
-        let paletteList = [];
-        Array.from(document.getElementById("palette").children).forEach((e, i) => {
-          paletteList[i] = e.value;
-        });
-        console.log(paletteList);
-        quantizeData(photoData, paletteList);
-      }
-    */
-    displayPhoto(resizedImgData);
+    if (document.getElementById("isQuantized").checked) {
+      let paletteList = [];
+      Array.from(document.getElementById("palette").children).forEach((e, i) => {
+        paletteList[i] = e.value; // Get format like “#abcdef”
+      });
+
+      paletteList = paletteList.slice(0, -1); // Remove extra “undefined”
+      paletteList.forEach((e, i) => {
+        paletteList[i] = parseInt(paletteList[i].slice(1), 16); // Convert to integer
+      });
+      // console.info(paletteList);
+
+      resizedImgData = quantizeData(resizedImgData, paletteList);
+    }
+    await displayPhoto(resizedImgData);
+
+    self.imgData = imgData; // For debug
+    self.resizedImgData = resizedImgData;
 
     clearErrorMessage(); // Clear any previous error message
     document.getElementById("uploadButton").disabled = false; // Enable the upload button
@@ -263,14 +315,25 @@ document.getElementById("captureButton").addEventListener("click", () => {
     .then(function (stream) {
       const video = document.createElement("video");
       video.srcObject = stream;
-      video.onloadedmetadata = function (ev) {
+      video.onloadedmetadata = async function (ev) {
         video.play();
-        const canvas = document.createElement("canvas");
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
-        const photoData = canvas.toDataURL("image/png");
-        displayPhoto(photoData);
+
+        const cnv = document.createElement("canvas");
+        cnv.width = video.videoWidth;
+        cnv.height = video.videoHeight;
+        cnv.getContext("2d").drawImage(video, 0, 0, cnv.width, cnv.height);
+
+        const imgData = cnv.toDataURL("image/webp");
+        let resizedImgData = await resizeImage(imgData);
+        if (document.getElementById("isQuantized").checked) {
+          let paletteList = [];
+          Array.from(document.getElementById("palette").children).forEach((e, i) => {
+            paletteList[i] = e.value;
+          });
+          resizedImgData = quantizeData(resizedImgData, paletteList);
+        }
+        await displayPhoto(resizedImgData);
+
         mediaStream.getTracks().forEach(function (track) {
           track.stop();
         });
@@ -288,13 +351,12 @@ async function resizeImage(imgData) {
   const MAX_HEIGHT = document.getElementById("max-height").value;
   let width, height;
 
-  console.info(typeof imgData);
   if (typeof imgData == "string") {
     const img = new Image();
     img.src = imgData;
     await img.ready();
-    width = image.width;
-    height = image.height;
+    width = img.width;
+    height = img.height;
   } else if (typeof imgData == "object") {
     width = imgData.width;
     height = imgData.height;
@@ -324,22 +386,131 @@ async function resizeImage(imgData) {
     cnv.height = imgData.height;
     ctx.putImageData(imgData, 0, 0);
     ctx.drawImage(cnv, 0, 0, width, height);
+    let temp = ctx.getImageData(0, 0, width, height);
     cnv.width = width;
     cnv.height = height;
+    ctx.putImageData(temp, 0, 0);
   }
 
-  // return ctx.getImageData(0, 0, width, height);
-  return cnv.toDataURL("image/webp");
+  return ctx.getImageData(0, 0, width, height);
+  // return cnv.toDataURL("image/webp");
 }
 
-document.getElementById("render").addEventListener("click", () => {
-  displayPhoto(resizedImage);
-});
+function quantizeData (imgData, palette) {
+  /*
+  const img = new Image();
+  if (typeof imgData == "object") {
+    const cnv = document.createElement("canvas");
+    cnv.width = imgData.width;
+    cnv.height = imgData.height;
+    const ctx = cnv.getContext("2d");
+    ctx.putImageData(imgData, 0, 0);
+    img.src = cnv.toDataURL("image/webp");
+  } else if (typeof imgData == "string") {
+    img.src = imgData;
+  }
+  */
+  const cnv = document.createElement("canvas");
+  cnv.width = imgData.width;
+  cnv.height = imgData.height;
+  const ctx = cnv.getContext("2d");
+  ctx.putImageData(imgData, 0, 0);
+
+  // let newImgDataArray = new Uint8Array((imgData.width * imgData.height) << 2);
+  let newImgDataArray = new Uint8Array(imgData.data.length);
+
+    /*
+    let distance = function (a1, a2, a3, b1, b2, b3) {
+      let x = a1 - b1;
+      let y = a2 - b2;
+      let z = a3 - b3;
+      return x * x + y * y + z * z;
+    };
+    */
+    let distance = function (a, b) {
+      let x = (a >> 16) - (b >> 16);
+      let y = (a >> 8 & 255) - (b >> 8 & 255);
+      let z = (a & 255) - (b & 255);
+      return x * x + y * y + z * z;
+    };
+    let findMin = function (arr, key) {
+      let keyArr = arr.map(key);
+      let minIndex = findIndexOfSmallestElement(keyArr);
+      return arr[minIndex];
+    };
+
+  for (let y = 0; y < imgData.height; y++) {
+    for (let x = 0; x < imgData.width; x++) {
+      let pixelIndex = (y * imgData.width + x) << 2;
+      let oldColour = (imgData.data[pixelIndex] << 16)
+        + (imgData.data[pixelIndex + 1] << 8)
+        + imgData.data[pixelIndex + 2]; // Get the colour of the current pixel
+      let closestColour = findMin(palette, (c) => distance(c, oldColour)); // Find the closest color in the palette
+      // encodedString[pixelIndex] = palette.indexOf(closestColour);
+	  encodedString = encodedString.concat(palette.indexOf(closestColour));
+      let error = (oldColour >> 16) - (closestColour >> 16)
+        + (oldColour >> 8 & 255) - (closestColour >> 8 & 255)
+        + (oldColour & 255) - (closestColour & 255); // Calculate the difference between the old colour and the closest colour
+
+      // Apply the error to the neighbouring pixels
+      // let newPixelR, newPixelG, newPixelB;
+      if (x < imgData.width - 1) { // (x+1, y)
+        imgData.data[y * imgData.width + x + 1] += 0.4375 * (error >> 16);
+        imgData.data[y * imgData.width + x + 2] += 0.4375 * (error >> 8 & 255);
+        imgData.data[y * imgData.width + x + 3] += 0.4375 * (error & 255);
+      }
+      if ((x > 0) && (y < imgData.height - 1)) { // (x-1, y+1)
+        imgData.data[(y + 1) * imgData.width + x - 1] += 0.1875 * (error >> 16);
+        imgData.data[(y + 1) * imgData.width + x] += 0.1875 * (error >> 8 & 255);
+        imgData.data[(y + 1) * imgData.width + x + 1] += 0.1875 * (error & 255);
+      }
+      if (y < imgData.height - 1) { // (x, y+1)
+        imgData.data[(y + 1) * imgData.width + x] += 0.3125 * (error >> 16);
+        imgData.data[(y + 1) * imgData.width + x + 1] += 0.3125 * (error >> 8 & 255);
+        imgData.data[(y + 1) * imgData.width + x + 2] += 0.3125 * (error & 255);
+      }
+      if ((x < imgData.width - 1) && (y < imgData.height - 1)) { // (x+1, y+1)
+        imgData.data[(y + 1) * imgData.width + x + 1] += 0.0625 * (error >> 16);
+        imgData.data[(y + 1) * imgData.width + x + 2] += 0.0625 * (error >> 8 & 255);
+        imgData.data[(y + 1) * imgData.width + x + 3] += 0.0625 * (error & 255);
+      }
+
+      // newImgDataArray[y * imgData.width + x] = palette[(y * imgData.width + x) % palette.length]; // Set the new pixel colour in the new image
+      newImgDataArray[pixelIndex] = closestColour >> 16;
+      newImgDataArray[pixelIndex + 1] = closestColour >> 8 & 255;
+      newImgDataArray[pixelIndex + 2] = closestColour & 255;
+      newImgDataArray[pixelIndex + 3] = 255;
+    }
+  }
+
+  let newImgData = new ImageData(imgData.width, imgData.height);
+  newImgData.data.set(newImgDataArray);
+  return newImgData;
+}
 
 document.getElementById("add-color-btn").addEventListener("click", () => {
   let el = document.createElement("input");
   el.type = "color";
   document.getElementById("palette").appendChild(el);
+});
+
+function encodeString(image, el = document.getElementById("encoded")) {
+  let text = "";
+  /*for (let i = 0; i < ; i++) {
+    for (let j = 0; j < ; j++) {*/
+      // text += image;
+    /*}
+  }*/
+  text = encodedString;
+  el.textContent = text;
+}
+
+document.getElementById("copyToClipboard").addEventListener("click", () => {
+  navigator.clipboard.writeText(document.getElementById("encoded").textContent);
+  document.getElementById("copy-popup").classList.toggle("show");
+  setTimeout(() => {
+    document.getElementById("copy-popup").classList.toggle("show");
+  }, 5000);
 });
 </script>
 </body>
