@@ -199,7 +199,8 @@ async function displayPhoto(imgData, el = photoContainer) {
     cnv.height = imgData.height;
     const ctx = cnv.getContext("2d");
     ctx.putImageData(imgData, 0, 0);
-    img.src = cnv.toDataURL("image/webp");
+    // img.src = cnv.toDataURL("image/webp");
+    img.src = cnv.toDataURL("image/png");
   } else if (typeof imgData == "string") {
     img.src = imgData;
   }
@@ -302,6 +303,8 @@ document.getElementById("uploadInput").addEventListener("change", async (ev) => 
 
     self.imgData = imgData; // For debug
     self.resizedImgData = resizedImgData;
+
+    encodeString(resizedImgData, document.getElementById("encoded")); // Generate string
 
     clearErrorMessage(); // Clear any previous error message
     document.getElementById("uploadButton").disabled = false; // Enable the upload button
@@ -455,24 +458,24 @@ function quantizeData (imgData, palette) {
       // Apply the error to the neighbouring pixels
       // let newPixelR, newPixelG, newPixelB;
       if (x < imgData.width - 1) { // (x+1, y)
-        imgData.data[y * imgData.width + x + 1] += 0.4375 * (error >> 16);
-        imgData.data[y * imgData.width + x + 2] += 0.4375 * (error >> 8 & 255);
-        imgData.data[y * imgData.width + x + 3] += 0.4375 * (error & 255);
+        imgData.data[(y * imgData.width + x + 1) << 2] += 0.4375 * (error >> 16);
+        imgData.data[(y * imgData.width + x + 1) << 2 + 1] += 0.4375 * (error >> 8 & 255);
+        imgData.data[(y * imgData.width + x + 1) << 2 + 2] += 0.4375 * (error & 255);
       }
       if ((x > 0) && (y < imgData.height - 1)) { // (x-1, y+1)
-        imgData.data[(y + 1) * imgData.width + x - 1] += 0.1875 * (error >> 16);
-        imgData.data[(y + 1) * imgData.width + x] += 0.1875 * (error >> 8 & 255);
-        imgData.data[(y + 1) * imgData.width + x + 1] += 0.1875 * (error & 255);
+        imgData.data[((y + 1) * imgData.width + x - 1) << 2] += 0.1875 * (error >> 16);
+        imgData.data[((y + 1) * imgData.width + x - 1) << 2 + 1] += 0.1875 * (error >> 8 & 255);
+        imgData.data[((y + 1) * imgData.width + x - 1) << 2 + 2] += 0.1875 * (error & 255);
       }
       if (y < imgData.height - 1) { // (x, y+1)
-        imgData.data[(y + 1) * imgData.width + x] += 0.3125 * (error >> 16);
-        imgData.data[(y + 1) * imgData.width + x + 1] += 0.3125 * (error >> 8 & 255);
-        imgData.data[(y + 1) * imgData.width + x + 2] += 0.3125 * (error & 255);
+        imgData.data[((y + 1) * imgData.width + x) << 2] += 0.3125 * (error >> 16);
+        imgData.data[((y + 1) * imgData.width + x) << 2 + 1] += 0.3125 * (error >> 8 & 255);
+        imgData.data[((y + 1) * imgData.width + x) << 2 + 2] += 0.3125 * (error & 255);
       }
       if ((x < imgData.width - 1) && (y < imgData.height - 1)) { // (x+1, y+1)
-        imgData.data[(y + 1) * imgData.width + x + 1] += 0.0625 * (error >> 16);
-        imgData.data[(y + 1) * imgData.width + x + 2] += 0.0625 * (error >> 8 & 255);
-        imgData.data[(y + 1) * imgData.width + x + 3] += 0.0625 * (error & 255);
+        imgData.data[((y + 1) * imgData.width + x + 1) << 2] += 0.0625 * (error >> 16);
+        imgData.data[((y + 1) * imgData.width + x + 1) << 2 + 1] += 0.0625 * (error >> 8 & 255);
+        imgData.data[((y + 1) * imgData.width + x + 1) << 2 + 2] += 0.0625 * (error & 255);
       }
 
       // newImgDataArray[y * imgData.width + x] = palette[(y * imgData.width + x) % palette.length]; // Set the new pixel colour in the new image
