@@ -133,7 +133,9 @@ input[type=color] {
   <div id="dithering-algorithm-container">
     <p>Dithering algorithm:</p>
     <select id="dithering-algorithm">
-      <option>Floyd–Steinberg</option>
+      <option>Floyd–Steinberg (floating-point arithmetics)</option>
+      <option>Floyd–Steinberg (bitwise operations)</option>
+      <option>No dithering</option>
     </select>
   </div>
   <div>
@@ -472,6 +474,8 @@ function quantizeData (imgData, palette) {
   const ctx = cnv.getContext("2d");
   ctx.putImageData(imgData, 0, 0);
 
+  encodedString = "";
+
   // let newImgDataArray = new Uint8Array((imgData.width * imgData.height) << 2);
   let newImgDataArray = new Uint8Array(imgData.data.length);
 
@@ -503,32 +507,60 @@ function quantizeData (imgData, palette) {
         + imgData.data[pixelIndex + 2]; // Get the colour of the current pixel
       let closestColour = findMin(palette, (c) => distance(c, oldColour)); // Find the closest color in the palette
       // encodedString[pixelIndex] = palette.indexOf(closestColour);
-	  encodedString = encodedString.concat(palette.indexOf(closestColour).toString(36));
-      let error = (oldColour >> 16) - (closestColour >> 16)
-        + (oldColour >> 8 & 255) - (closestColour >> 8 & 255)
-        + (oldColour & 255) - (closestColour & 255); // Calculate the difference between the old colour and the closest colour
+      encodedString = encodedString.concat(palette.indexOf(closestColour).toString(36));
 
-      // Apply the error to the neighbouring pixels
-      // let newPixelR, newPixelG, newPixelB;
-      if (x < imgData.width - 1) { // (x+1, y)
-        imgData.data[(y * imgData.width + x + 1) << 2] += 0.4375 * (error >> 16);
-        imgData.data[(y * imgData.width + x + 1) << 2 + 1] += 0.4375 * (error >> 8 & 255);
-        imgData.data[(y * imgData.width + x + 1) << 2 + 2] += 0.4375 * (error & 255);
-      }
-      if ((x > 0) && (y < imgData.height - 1)) { // (x-1, y+1)
-        imgData.data[((y + 1) * imgData.width + x - 1) << 2] += 0.1875 * (error >> 16);
-        imgData.data[((y + 1) * imgData.width + x - 1) << 2 + 1] += 0.1875 * (error >> 8 & 255);
-        imgData.data[((y + 1) * imgData.width + x - 1) << 2 + 2] += 0.1875 * (error & 255);
-      }
-      if (y < imgData.height - 1) { // (x, y+1)
-        imgData.data[((y + 1) * imgData.width + x) << 2] += 0.3125 * (error >> 16);
-        imgData.data[((y + 1) * imgData.width + x) << 2 + 1] += 0.3125 * (error >> 8 & 255);
-        imgData.data[((y + 1) * imgData.width + x) << 2 + 2] += 0.3125 * (error & 255);
-      }
-      if ((x < imgData.width - 1) && (y < imgData.height - 1)) { // (x+1, y+1)
-        imgData.data[((y + 1) * imgData.width + x + 1) << 2] += 0.0625 * (error >> 16);
-        imgData.data[((y + 1) * imgData.width + x + 1) << 2 + 1] += 0.0625 * (error >> 8 & 255);
-        imgData.data[((y + 1) * imgData.width + x + 1) << 2 + 2] += 0.0625 * (error & 255);
+      switch (document.getElementById("dithering-algorithm").value) {
+        case "Floyd–Steinberg (floating-point arithmetics)":
+          let error = (oldColour >> 16) - (closestColour >> 16)
+            + (oldColour >> 8 & 255) - (closestColour >> 8 & 255)
+            + (oldColour & 255) - (closestColour & 255); // Calculate the difference between the old colour and the closest colour
+
+          // Apply the error to the neighbouring pixels
+          if (x < imgData.width - 1) { // (x+1, y)
+            imgData.data[(y * imgData.width + x + 1) << 2] += 0.4375 * (error >> 16);
+            imgData.data[(y * imgData.width + x + 1) << 2 + 1] += 0.4375 * (error >> 8 & 255);
+            imgData.data[(y * imgData.width + x + 1) << 2 + 2] += 0.4375 * (error & 255);
+          }
+          if ((x > 0) && (y < imgData.height - 1)) { // (x-1, y+1)
+            imgData.data[((y + 1) * imgData.width + x - 1) << 2] += 0.1875 * (error >> 16);
+            imgData.data[((y + 1) * imgData.width + x - 1) << 2 + 1] += 0.1875 * (error >> 8 & 255);
+            imgData.data[((y + 1) * imgData.width + x - 1) << 2 + 2] += 0.1875 * (error & 255);
+          }
+          if (y < imgData.height - 1) { // (x, y+1)
+            imgData.data[((y + 1) * imgData.width + x) << 2] += 0.3125 * (error >> 16);
+            imgData.data[((y + 1) * imgData.width + x) << 2 + 1] += 0.3125 * (error >> 8 & 255);
+            imgData.data[((y + 1) * imgData.width + x) << 2 + 2] += 0.3125 * (error & 255);
+          }
+          if ((x < imgData.width - 1) && (y < imgData.height - 1)) { // (x+1, y+1)
+            imgData.data[((y + 1) * imgData.width + x + 1) << 2] += 0.0625 * (error >> 16);
+            imgData.data[((y + 1) * imgData.width + x + 1) << 2 + 1] += 0.0625 * (error >> 8 & 255);
+            imgData.data[((y + 1) * imgData.width + x + 1) << 2 + 2] += 0.0625 * (error & 255);
+          }
+          break;
+        case "Floyd–Steinberg (bitwise operations)":
+            if (x < imgData.width - 1) { // (x+1, y)
+            imgData.data[(y * imgData.width + x + 1) << 2] += 7 * (error >> 16) >> 4;
+            imgData.data[(y * imgData.width + x + 1) << 2 + 1] += 7 * (error >> 8 & 255 >> 4);
+            imgData.data[(y * imgData.width + x + 1) << 2 + 2] += 7 * (error & 255) >> 4;
+          }
+          if ((x > 0) && (y < imgData.height - 1)) { // (x-1, y+1)
+            imgData.data[((y + 1) * imgData.width + x - 1) << 2] += 3 * (error >> 16) >> 4;
+            imgData.data[((y + 1) * imgData.width + x - 1) << 2 + 1] += 3 * (error >> 8 & 255) >> 4;
+            imgData.data[((y + 1) * imgData.width + x - 1) << 2 + 2] += 3 * (error & 255) >> 4;
+          }
+          if (y < imgData.height - 1) { // (x, y+1)
+            imgData.data[((y + 1) * imgData.width + x) << 2] += 5 * (error >> 16) >> 4;
+            imgData.data[((y + 1) * imgData.width + x) << 2 + 1] += 5 * (error >> 8 & 255) >> 4;
+            imgData.data[((y + 1) * imgData.width + x) << 2 + 2] += 5 * (error & 255) >> 4;
+          }
+          if ((x < imgData.width - 1) && (y < imgData.height - 1)) { // (x+1, y+1)
+            imgData.data[((y + 1) * imgData.width + x + 1) << 2] += (error >> 16) >> 4;
+            imgData.data[((y + 1) * imgData.width + x + 1) << 2 + 1] += (error >> 8 & 255) >> 4;
+            imgData.data[((y + 1) * imgData.width + x + 1) << 2 + 2] += (error & 255) >> 4;
+          }
+          break;
+        default: // No dithering
+          break;
       }
 
       // newImgDataArray[y * imgData.width + x] = palette[(y * imgData.width + x) % palette.length]; // Set the new pixel colour in the new image
