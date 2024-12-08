@@ -117,11 +117,24 @@ input[type=color] {
   </div>
   <button id="captureButton">Take a Photo</button>
   <button id="uploadButton" disabled>Upload Image</button>
+  <button id="refresh">Refresh Image</button>
   <div id="errorMessage"></div>
   <div id="photoContainer"></div>
   <div>
     <label for="isQuantized">Quantize the image</label>
     <input type="checkbox" id="isQuantized" checked>
+  </div>
+  <div id="quantization-algorithm-container">
+    <p>Quantization algorithm:</p>
+    <select id="quantization-algorithm">
+      <option>RGB straight-line distance</option>
+    </select>
+  </div>
+  <div id="dithering-algorithm-container">
+    <p>Dithering algorithm:</p>
+    <select id="dithering-algorithm">
+      <option>Floyd–Steinberg</option>
+    </select>
   </div>
   <div>
     <p>Palette for quantization:</p>
@@ -145,8 +158,33 @@ input[type=color] {
     </div>
   </div>
   <div>
+    <label for="palette-presets">Palette presets:</label>
+    <select id="palette-presets">
+      <option>Black and white only</option>
+      <option>2-bit grayscale</option>
+      <option>Demo legacy</option>
+      <option>Minecraft plain</option>
+      <option>r/place 2023 8 colours</option>
+      <option>r/place 2022-2023 16 colours</option>
+      <option>r/place 2022-2023 24 colours</option>
+      <option>r/place 2022-2023 32 colours</option>
+      <option>r/place 2017</option>
+    </select>
+  </div>
+  <div style="display: flex; flex-direction: column; align-items: center;">
+    <div id="palette-text" style="font-family: monospace; font-size: 1rem; border: 2px solid #ccc; border-radius: 10px; padding: 0.25rem;" contenteditable="true">000000ffffff</div>
+    <div style="display: flex; flex-direction: row;">
+      <button id="import-palette">Import palette</button>
+      <button id="export-palette">Export palette</button>
+    </div>
+    <div class="popup">
+      <button id="copyPaletteToClipboard">Copy to Clipboard</button>
+      <span class="popuptext" id="copy-popup">String copied!</span>
+    </div>
+  </div>
+  <div style="display: flex; flex-direction: column; align-items: center;">
     <label for="encoded">Encoded String:</label>
-    <div id="encoded" style="font-family: monospace;"></div>
+    <div id="encoded" style="font-family: monospace; font-size: 1rem; max-width: 70vw; overflow-x: hidden; border: 2px solid #ccc; border-radius: 10px; padding: 0.25rem;"></div>
     <div class="popup">
       <button id="copyToClipboard">Copy to Clipboard</button>
       <span class="popuptext" id="copy-popup">String copied!</span>
@@ -182,6 +220,18 @@ let findIndexOfSmallestElement = function (arr) {
 };
 
 // (()=>{var s=class extends EventTarget{static sleep(t){return new Promise(e=>{self.AbortSignal?AbortSignal.timeout(t).addEventListener("abort",e):setTimeout(e,t)})}#s;#e;#t=!1;get finished(){return this.#t}finish(){this.#t=!0,this.#e&&this.#e()}wait(){if(!this.#t)return this.#s}constructor(){super(),this.#s=new Promise(t=>{this.#e=()=>{this.#t=!0,t()}})}},i=s;self.miniSignal=i;})();
+
+let palettePresets = {
+  "Black and white only": "000000ffffff",
+  "2-bit grayscale": "000000888888ccccccffffff",
+  "Demo legacy": "000000808080ffffffffc0cbff0000ffa500ffff0000ff0000800000ffff0000ff000080800080ff00ffe6e6fa",
+  "Minecraft plain": "",
+  "r/place 2023 8 colours": "FF4500FFA800FFD63500A3683690EAB44AC0000000FFFFFF",
+  "r/place 2022-2023 16 colours": "FF4500FFA800FFD63500A3687EED562450A43690EA51E9F4811E9FB44AC0FF99AA9C6926000000898D90D4D7D9FFFFFF",
+  "r/place 2022-2023 24 colours": "BE0039FF4500FFA800FFD63500A36800CC787EED5600756F009EAA2450A43690EA51E9F4493AC16A5CFF811E9FB44AC0FF3881FF99AA6D482F9C6926000000898D90D4D7D9FFFFFF",
+  "r/place 2022-2023 32 colours": "6D001ABE0039FF4500FFA800FFD635FFF8B800A36800CC787EED5600756F009EAA00CCC02450A43690EA51E9F4493AC16A5CFF94B3FF811E9FB44AC0E4ABFFDE107FFF3881FF99AA6D482F9C6926FFB470000000515252898D90D4D7D9FFFFFF",
+  "r/place 2017": "FFFFFFE4E4E4888888222222FFA7D1E50000E59500A06A42E5D90094E04402BE0100E5F00083C70000EAE04AFF820080"
+};
 </script>
 <script>
 "use strict";
@@ -266,6 +316,43 @@ document.getElementById("max-height").addEventListener("input", (ev) => {
   }
 });
 
+let renderImage = async function (file) {
+  const img = new Image();
+  img.src = blobUrl;
+  await img.ready();
+
+  let cnv = document.createElement("canvas");
+  cnv.width = img.width;
+  cnv.height = img.height;
+  let ctx = cnv.getContext("2d");
+  ctx.drawImage(await createImageBitmap(file), 0, 0);
+  let imgData = ctx.getImageData(0, 0, img.width, img.height);
+  let resizedImgData = await resizeImage(imgData);
+  if (document.getElementById("isQuantized").checked) {
+    let paletteList = [];
+    Array.from(document.getElementById("palette").children).forEach((e, i) => {
+      paletteList[i] = e.value; // Get format like “#abcdef”
+    });
+
+    paletteList = paletteList.slice(0, -1); // Remove extra “undefined”
+    paletteList.forEach((e, i) => {
+      paletteList[i] = parseInt(paletteList[i].slice(1), 16); // Convert to integer
+    });
+    // console.info(paletteList);
+
+    resizedImgData = quantizeData(resizedImgData, paletteList);
+  }
+  await displayPhoto(resizedImgData);
+
+  self.imgData = imgData; // For debug
+  self.resizedImgData = resizedImgData;
+
+  encodeString(resizedImgData, document.getElementById("encoded")); // Generate string
+
+  clearErrorMessage(); // Clear any previous error message
+  document.getElementById("uploadButton").disabled = false; // Enable the upload button
+};
+
 document.getElementById("uploadInput").addEventListener("change", async (ev) => {
   const file = ev.target.files[0];
 
@@ -273,41 +360,7 @@ document.getElementById("uploadInput").addEventListener("change", async (ev) => 
     if (blobUrl)
       URL.revokeObjectURL(blobUrl);
     blobUrl = URL.createObjectURL(file);
-
-    const img = new Image();
-    img.src = blobUrl;
-    await img.ready();
-
-    let cnv = document.createElement("canvas");
-    cnv.width = img.width;
-    cnv.height = img.height;
-    let ctx = cnv.getContext("2d");
-    ctx.drawImage(await createImageBitmap(file), 0, 0);
-    let imgData = ctx.getImageData(0, 0, img.width, img.height);
-    let resizedImgData = await resizeImage(imgData);
-    if (document.getElementById("isQuantized").checked) {
-      let paletteList = [];
-      Array.from(document.getElementById("palette").children).forEach((e, i) => {
-        paletteList[i] = e.value; // Get format like “#abcdef”
-      });
-
-      paletteList = paletteList.slice(0, -1); // Remove extra “undefined”
-      paletteList.forEach((e, i) => {
-        paletteList[i] = parseInt(paletteList[i].slice(1), 16); // Convert to integer
-      });
-      // console.info(paletteList);
-
-      resizedImgData = quantizeData(resizedImgData, paletteList);
-    }
-    await displayPhoto(resizedImgData);
-
-    self.imgData = imgData; // For debug
-    self.resizedImgData = resizedImgData;
-
-    encodeString(resizedImgData, document.getElementById("encoded")); // Generate string
-
-    clearErrorMessage(); // Clear any previous error message
-    document.getElementById("uploadButton").disabled = false; // Enable the upload button
+    await renderImage(file);
   } else {
     displayErrorMessage("Please select a valid image file.");
   }
@@ -450,7 +503,7 @@ function quantizeData (imgData, palette) {
         + imgData.data[pixelIndex + 2]; // Get the colour of the current pixel
       let closestColour = findMin(palette, (c) => distance(c, oldColour)); // Find the closest color in the palette
       // encodedString[pixelIndex] = palette.indexOf(closestColour);
-	  encodedString = encodedString.concat(palette.indexOf(closestColour));
+	  encodedString = encodedString.concat(palette.indexOf(closestColour).toString(36));
       let error = (oldColour >> 16) - (closestColour >> 16)
         + (oldColour >> 8 & 255) - (closestColour >> 8 & 255)
         + (oldColour & 255) - (closestColour & 255); // Calculate the difference between the old colour and the closest colour
@@ -482,7 +535,8 @@ function quantizeData (imgData, palette) {
       newImgDataArray[pixelIndex] = closestColour >> 16;
       newImgDataArray[pixelIndex + 1] = closestColour >> 8 & 255;
       newImgDataArray[pixelIndex + 2] = closestColour & 255;
-      newImgDataArray[pixelIndex + 3] = 255;
+      // newImgDataArray[pixelIndex + 3] = 255;
+      newImgDataArray[pixelIndex + 3] = imgData.data[pixelIndex + 3]; // Put the original alpha values onto the new iamge data
     }
   }
 
@@ -490,6 +544,62 @@ function quantizeData (imgData, palette) {
   newImgData.data.set(newImgDataArray);
   return newImgData;
 }
+
+document.getElementById("refresh").addEventListener("click", async () => {
+  await renderImage(document.getElementById("uploadInput").files[0]);
+});
+
+document.getElementById("isQuantized").addEventListener("input", (ev) => {
+  if (ev.target.checked) {
+    document.getElementById("quantization-algorithm-container").style.display = "block";
+    document.getElementById("dithering-algorithm-container").style.display = "block";
+  }
+  else {
+    document.getElementById("quantization-algorithm-container").style.display = "none";
+    document.getElementById("dithering-algorithm-container").style.display = "none";
+  }
+});
+
+document.getElementById("palette-presets").addEventListener("input", (ev) => {
+  let value = palettePresets[ev.target.value];
+  document.getElementById("palette-text").innerText = "";
+  document.getElementById("palette-text").appendChild(document.createTextNode(value));
+});
+
+document.getElementById("import-palette").addEventListener("click", () => {
+  document.getElementById("palette").innerHTML = "";
+  let rawPalette = document.getElementById("palette-text").textContent;
+  while (rawPalette) {
+    let colour = rawPalette.slice(0, 6); // Get first 6 characters
+    if (colour.length < 6) {
+      colour = colour.padStart(6, "0");
+    }
+
+    let el = document.createElement("input");
+    el.type = "color";
+    el.value = "#" + colour;
+    document.getElementById("palette").appendChild(el);
+
+    rawPalette = rawPalette.slice(6); // Remove first 6 characters
+  }
+
+  let addColourBtn = document.createElement("div");
+  addColourBtn.appendChild(document.createTextNode("+"));
+  addColourBtn.id = "add-color-btn";
+  document.getElementById("palette").appendChild(addColourBtn);
+});
+
+document.getElementById("export-palette").addEventListener("click", () => {
+  let paletteList = [];
+  Array.from(document.getElementById("palette").children).forEach((e, i) => {
+    paletteList[i] = e.value?.slice(1); // Get format like “#abcdef”
+  });
+
+  paletteList = paletteList.slice(0, -1); // Remove extra “undefined”
+
+  document.getElementById("palette-text").innerText = "";
+  document.getElementById("palette-text").appendChild(document.createTextNode(paletteList.join("")));
+});
 
 document.getElementById("add-color-btn").addEventListener("click", () => {
   let el = document.createElement("input");
@@ -508,6 +618,14 @@ function encodeString(image, el = document.getElementById("encoded")) {
   el.textContent = text;
 }
 
+document.getElementById("copyPaletteToClipboard").addEventListener("click", () => {
+  navigator.clipboard.writeText(document.getElementById("palette-text").textContent);
+  document.getElementById("copy-popup").classList.toggle("show");
+  setTimeout(() => {
+    document.getElementById("copy-popup").classList.toggle("show");
+  }, 5000);
+});
+
 document.getElementById("copyToClipboard").addEventListener("click", () => {
   navigator.clipboard.writeText(document.getElementById("encoded").textContent);
   document.getElementById("copy-popup").classList.toggle("show");
@@ -515,6 +633,16 @@ document.getElementById("copyToClipboard").addEventListener("click", () => {
     document.getElementById("copy-popup").classList.toggle("show");
   }, 5000);
 });
+
+let saveFile = (blob, filename) => {
+  const a = document.createElement("a");
+  a.download = filename;
+  a.href = URL.createObjectURL(blob);
+  a.addEventListener("click", () => {
+    setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+  });
+  a.click();
+};
 </script>
 </body>
 </html>
