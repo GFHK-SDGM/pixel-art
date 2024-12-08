@@ -508,10 +508,11 @@ function quantizeData (imgData, palette) {
       let closestColour = findMin(palette, (c) => distance(c, oldColour)); // Find the closest color in the palette
       // encodedString[pixelIndex] = palette.indexOf(closestColour);
       encodedString = encodedString.concat(palette.indexOf(closestColour).toString(36));
+      let error;
 
       switch (document.getElementById("dithering-algorithm").value) {
         case "Floyd–Steinberg (floating-point arithmetics)":
-          let error = (oldColour >> 16) - (closestColour >> 16)
+          error = (oldColour >> 16) - (closestColour >> 16)
             + (oldColour >> 8 & 255) - (closestColour >> 8 & 255)
             + (oldColour & 255) - (closestColour & 255); // Calculate the difference between the old colour and the closest colour
 
@@ -538,7 +539,12 @@ function quantizeData (imgData, palette) {
           }
           break;
         case "Floyd–Steinberg (bitwise operations)":
-            if (x < imgData.width - 1) { // (x+1, y)
+          error = (oldColour >> 16) - (closestColour >> 16)
+            + (oldColour >> 8 & 255) - (closestColour >> 8 & 255)
+            + (oldColour & 255) - (closestColour & 255); // Calculate the difference between the old colour and the closest colour
+
+          // Apply the error to the neighbouring pixels
+          if (x < imgData.width - 1) { // (x+1, y)
             imgData.data[(y * imgData.width + x + 1) << 2] += 7 * (error >> 16) >> 4;
             imgData.data[(y * imgData.width + x + 1) << 2 + 1] += 7 * (error >> 8 & 255 >> 4);
             imgData.data[(y * imgData.width + x + 1) << 2 + 2] += 7 * (error & 255) >> 4;
