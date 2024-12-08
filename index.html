@@ -151,7 +151,8 @@ input[type=color] {
       <option>Black and white only</option>
       <option>2-bit grayscale</option>
       <option>Demo legacy</option>
-      <option>Minecraft plain</option>
+      <option>Minecraft dye colours (text)</option>
+      <option>Minecraft dye colours (entities)</option>
       <option>r/place 2023 8 colours</option>
       <option>r/place 2022-2023 16 colours</option>
       <option>r/place 2022-2023 24 colours</option>
@@ -213,7 +214,8 @@ let palettePresets = {
   "Black and white only": "000000ffffff",
   "2-bit grayscale": "000000888888ccccccffffff",
   "Demo legacy": "000000808080ffffffffc0cbff0000ffa500ffff0000ff0000800000ffff0000ff000080800080ff00ffe6e6fa",
-  "Minecraft plain": "",
+  "Minecraft dye colours (text)": "FFFFFFFF681FFF00FF9AC0CDFFFF00BFFF00FF69B4808080D3D3D300FFFFA020F00000FF8B451300FF00FF0000000000",
+  "Minecraft dye colours (entities)": "1D1D21B02E265E7C168354323C44AA8932B8169C9C9D9D97474F52F38BAA80C71FFED83D3AB3DAC74EBDF9801DF9FFFE",
   "r/place 2023 8 colours": "FF4500FFA800FFD63500A3683690EAB44AC0000000FFFFFF",
   "r/place 2022-2023 16 colours": "FF4500FFA800FFD63500A3687EED562450A43690EA51E9F4811E9FB44AC0FF99AA9C6926000000898D90D4D7D9FFFFFF",
   "r/place 2022-2023 24 colours": "BE0039FF4500FFA800FFD63500A36800CC787EED5600756F009EAA2450A43690EA51E9F4493AC16A5CFF811E9FB44AC0FF3881FF99AA6D482F9C6926000000898D90D4D7D9FFFFFF",
@@ -604,6 +606,14 @@ document.getElementById("isQuantized").addEventListener("input", (ev) => {
   }
 });
 
+document.getElementById("quantization-algorithm").addEventListener("input", () => {
+  document.getElementById("refresh").click();
+});
+
+document.getElementById("dithering-algorithm").addEventListener("input", () => {
+  document.getElementById("refresh").click();
+});
+
 document.getElementById("palette-presets").addEventListener("input", (ev) => {
   let value = palettePresets[ev.target.value];
   document.getElementById("palette-text").innerText = "";
@@ -632,6 +642,7 @@ document.getElementById("import-palette").addEventListener("click", () => {
   addColourBtn.appendChild(document.createTextNode("+"));
   addColourBtn.id = "add-color-btn";
   document.getElementById("palette").appendChild(addColourBtn);
+  document.getElementById("refresh").click();
 });
 
 document.getElementById("export-palette").addEventListener("click", () => {
