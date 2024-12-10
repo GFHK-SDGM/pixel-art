@@ -127,6 +127,7 @@ input[type=color] {
     <p>Quantization algorithm:</p>
     <select id="quantization-algorithm">
       <option>RGB straight-line distance</option>
+      <option>YCbCr straight-line distance</option>
     </select>
   </div>
   <div id="dithering-algorithm-container">
@@ -150,7 +151,10 @@ input[type=color] {
     <select id="palette-presets">
       <option>Black and white only</option>
       <option>2-bit grayscale</option>
+      <option>4-bit grayscale</option>
+      <option>3-bit RGB</option>
       <option>Demo legacy</option>
+      <option>Conifer</option>
       <option>Minecraft dye colours (text)</option>
       <option>Minecraft dye colours (entities)</option>
       <option>r/place 2023 8 colours</option>
@@ -212,8 +216,11 @@ let findIndexOfSmallestElement = function (arr) {
 
 let palettePresets = {
   "Black and white only": "000000ffffff",
-  "2-bit grayscale": "000000888888ccccccffffff",
+  "2-bit grayscale": "000000555555aaaaaaffffff",
+  "4-bit grayscale": "000000111111222222333333444444555555666666777777888888999999aaaaaabbbbbbccccccddddddeeeeeeffffff",
+  "3-bit RGB": "0000000000ff00ff0000ffffff0000ff00ffffff00ffffff",
   "Demo legacy": "000000808080ffffffffc0cbff0000ffa500ffff0000ff0000800000ffff0000ff000080800080ff00ffe6e6fa",
+  "Conifer": "0000000000aa00aa0000aaaaaa0000aa00aaaaaa00aaaaaa5555555555ff55ff5555ffffff5555ff55ffffff55ffffff",
   "Minecraft dye colours (text)": "FFFFFFFF681FFF00FF9AC0CDFFFF00BFFF00FF69B4808080D3D3D300FFFFA020F00000FF8B451300FF00FF0000000000",
   "Minecraft dye colours (entities)": "1D1D21B02E265E7C168354323C44AA8932B8169C9C9D9D97474F52F38BAA80C71FFED83D3AB3DAC74EBDF9801DF9FFFE",
   "r/place 2023 8 colours": "FF4500FFA800FFD63500A3683690EAB44AC0000000FFFFFF",
