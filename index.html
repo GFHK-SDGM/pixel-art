@@ -135,6 +135,8 @@ input[type=color] {
     <select id="dithering-algorithm">
       <option>Floyd–Steinberg (floating-point arithmetics)</option>
       <option>Floyd–Steinberg (bitwise operations)</option>
+      <option>Floyd–Steinberg (failed attempt, floating-point arithmetics)</option>
+      <option>Floyd–Steinberg (failed attempt, bitwise operations)</option>
       <option>No dithering</option>
     </select>
   </div>
@@ -153,6 +155,7 @@ input[type=color] {
       <option>2-bit grayscale</option>
       <option>4-bit grayscale</option>
       <option>3-bit RGB</option>
+      <option>6-bit RGB</option>
       <option>Demo legacy</option>
       <option>Conifer</option>
       <option>Minecraft dye colours (text)</option>
@@ -165,7 +168,7 @@ input[type=color] {
     </select>
   </div>
   <div style="display: flex; flex-direction: column; align-items: center;">
-    <div id="palette-text" style="font-family: monospace; font-size: 1rem; border: 2px solid #ccc; border-radius: 10px; padding: 0.25rem;" contenteditable="true">000000ffffff</div>
+    <div id="palette-text" style="font-family: monospace; font-size: 1rem; max-width: 100vw; max-height: 5rem; overflow-x: hidden; overflow-wrap: anywhere; border: 2px solid #ccc; border-radius: 10px; padding: 0.25rem;" contenteditable="true">000000ffffff</div>
     <div style="display: flex; flex-direction: row;">
       <button id="import-palette">Import palette</button>
       <button id="export-palette">Export palette</button>
@@ -177,7 +180,7 @@ input[type=color] {
   </div>
   <div style="display: flex; flex-direction: column; align-items: center;">
     <label for="encoded">Encoded String:</label>
-    <div id="encoded" style="font-family: monospace; font-size: 1rem; max-width: 70vw; overflow-x: hidden; border: 2px solid #ccc; border-radius: 10px; padding: 0.25rem;"></div>
+    <div id="encoded" style="font-family: monospace; font-size: 1rem; max-width: 70vw; max-height: 5rem; overflow-x: hidden; overflow-wrap: anywhere; border: 2px solid #ccc; border-radius: 10px; padding: 0.25rem;"></div>
     <div class="popup">
       <button id="copyToClipboard">Copy to Clipboard</button>
       <span class="popuptext" id="copy-popup">String copied!</span>
@@ -219,6 +222,7 @@ let palettePresets = {
   "2-bit grayscale": "000000555555aaaaaaffffff",
   "4-bit grayscale": "000000111111222222333333444444555555666666777777888888999999aaaaaabbbbbbccccccddddddeeeeeeffffff",
   "3-bit RGB": "0000000000ff00ff0000ffffff0000ff00ffffff00ffffff",
+  "6-bit RGB": "0000000000550000aa0000ff0055000055550055aa0055ff00aa0000aa5500aaaa00aaff00ff0000ff5500ffaa00ffff5500005500555500aa5500ff5555005555555555aa5555ff55aa0055aa5555aaaa55aaff55ff0055ff5555ffaa55ffffaa0000aa0055aa00aaaa00ffaa5500aa5555aa55aaaa55ffaaaa00aaaa55aaaaaaaaaaffaaff00aaff55aaffaaaaffffff0000ff0055ff00aaff00ffff5500ff5555ff55aaff55ffffaa00ffaa55ffaaaaffaaffffff00ffff55ffffaaffffff",
   "Demo legacy": "000000808080ffffffffc0cbff0000ffa500ffff0000ff0000800000ffff0000ff000080800080ff00ffe6e6fa",
   "Conifer": "000000aa000000aa00aaaa000000aaaa00aa00aaaaaaaaaa555555ff555555ff55ffff555555ffff55ff55ffffffffff",
   "Minecraft dye colours (text)": "FFFFFFFF681FFF00FF9AC0CDFFFF00BFFF00FF69B4808080D3D3D300FFFFA020F00000FF8B451300FF00FF0000000000",
@@ -230,10 +234,10 @@ let palettePresets = {
   "r/place 2017": "FFFFFFE4E4E4888888222222FFA7D1E50000E59500A06A42E5D90094E04402BE0100E5F00083C70000EAE04AFF820080"
 };
 
-let RGBtoYCbCr = function (RGB) {
+let RGBToYCbCr = function (RGB) {
   let r = RGB >> 16,
     g = RGB >> 8 & 255,
-	b = RGB & 255;
+    b = RGB & 255;
 
   let Y = 0.299 * r + 0.587 * g + 0.114 * b;
   let Cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
@@ -242,16 +246,16 @@ let RGBtoYCbCr = function (RGB) {
   return (Y << 16) + (Cb << 8) + Cr;
 };
 
-let YCbCrtoRGB = function (YCbCr) {
+let YCbCrToRGB = function (YCbCr) {
   let Y = YCbCr >> 16,
     Cb = YCbCr >> 8 & 255,
-	Cr = YCbCr & 255;
+    Cr = YCbCr & 255;
 
   let r = Y + 1.402 * (Cr - 128);
   let g = Y - 0.344136 * (Cb - 128) - 0.714136 * (Cr - 128);
   let b = Y + 1.772 * (Cb - 128);
 
-  return (r << 16) + (g << 8) + n;
+  return (r << 16) + (g << 8) + b;
 };
 </script>
 <script>
@@ -383,6 +387,9 @@ let renderImage = async function (file) {
 
     resizedImgData = quantizeData(resizedImgData, paletteList);
   }
+  else {
+    encodedString = "";
+  }
   await displayPhoto(resizedImgData);
 
   self.imgData = imgData; // For debug
@@ -494,49 +501,29 @@ async function resizeImage(imgData) {
 }
 
 function quantizeData (imgData, palette) {
-  /*
-  const img = new Image();
-  if (typeof imgData == "object") {
-    const cnv = document.createElement("canvas");
-    cnv.width = imgData.width;
-    cnv.height = imgData.height;
-    const ctx = cnv.getContext("2d");
-    ctx.putImageData(imgData, 0, 0);
-    img.src = cnv.toDataURL("image/webp");
-  } else if (typeof imgData == "string") {
-    img.src = imgData;
-  }
-  */
-  const cnv = document.createElement("canvas");
-  cnv.width = imgData.width;
-  cnv.height = imgData.height;
-  const ctx = cnv.getContext("2d");
-  ctx.putImageData(imgData, 0, 0);
-
   encodedString = "";
 
-  // let newImgDataArray = new Uint8Array((imgData.width * imgData.height) << 2);
   let newImgDataArray = new Uint8Array(imgData.data.length);
 
-    /*
-    let distance = function (a1, a2, a3, b1, b2, b3) {
-      let x = a1 - b1;
-      let y = a2 - b2;
-      let z = a3 - b3;
-      return x * x + y * y + z * z;
-    };
-    */
-    let distance = function (a, b) {
-      let x = (a >> 16) - (b >> 16);
-      let y = (a >> 8 & 255) - (b >> 8 & 255);
-      let z = (a & 255) - (b & 255);
-      return x * x + y * y + z * z;
-    };
-    let findMin = function (arr, key) {
-      let keyArr = arr.map(key);
-      let minIndex = findIndexOfSmallestElement(keyArr);
-      return arr[minIndex];
-    };
+  /*
+  let distance = function (a1, a2, a3, b1, b2, b3) {
+    let x = a1 - b1;
+    let y = a2 - b2;
+    let z = a3 - b3;
+    return x * x + y * y + z * z;
+  };
+  */
+  let distance = function (a, b) {
+    let x = (a >> 16) - (b >> 16);
+    let y = (a >> 8 & 255) - (b >> 8 & 255);
+    let z = (a & 255) - (b & 255);
+    return x * x + y * y + z * z;
+  };
+  let findMin = function (arr, key) {
+    let keyArr = arr.map(key);
+    let minIndex = findIndexOfSmallestElement(keyArr);
+    return arr[minIndex];
+  };
 
   for (let y = 0; y < imgData.height; y++) {
     for (let x = 0; x < imgData.width; x++) {
@@ -548,10 +535,10 @@ function quantizeData (imgData, palette) {
       let closestColour;
       switch (document.getElementById("quantization-algorithm").value) {
         case "YCbCr straight-line distance":
-          oldColour = RGBtoYCbCr(oldColour);
-          let YCbCrPalette = palette.map(RGBtoYCbCr);
+          oldColour = RGBToYCbCr(oldColour);
+          let YCbCrPalette = palette.map(RGBToYCbCr);
 
-          closestColour = findMin(palette, (c) => distance(c, oldColour)); // Find the closest color in the palette
+          closestColour = YCbCrToRGB(findMin(YCbCrPalette, (c) => distance(c, oldColour))); // Find the closest color in the palette
           break;
         default: // RGB straight-line distance
           closestColour = findMin(palette, (c) => distance(c, oldColour)); // Find the closest color in the palette
@@ -563,6 +550,60 @@ function quantizeData (imgData, palette) {
 
       switch (document.getElementById("dithering-algorithm").value) {
         case "Floyd–Steinberg (floating-point arithmetics)":
+          error = ((oldColour >> 16) - (closestColour >> 16)) << 16
+            + ((oldColour >> 8 & 255) - (closestColour >> 8 & 255)) << 8
+            + (oldColour & 255) - (closestColour & 255); // Calculate the difference between the old colour and the closest colour
+
+          // Apply the error to the neighbouring pixels
+          if (x < imgData.width - 1) { // (x+1, y)
+            imgData.data[(y * imgData.width + x + 1) << 2] += 0.4375 * (error >> 16);
+            imgData.data[(y * imgData.width + x + 1) << 2 + 1] += 0.4375 * (error >> 8 & 255);
+            imgData.data[(y * imgData.width + x + 1) << 2 + 2] += 0.4375 * (error & 255);
+          }
+          if ((x > 0) && (y < imgData.height - 1)) { // (x-1, y+1)
+            imgData.data[((y + 1) * imgData.width + x - 1) << 2] += 0.1875 * (error >> 16);
+            imgData.data[((y + 1) * imgData.width + x - 1) << 2 + 1] += 0.1875 * (error >> 8 & 255);
+            imgData.data[((y + 1) * imgData.width + x - 1) << 2 + 2] += 0.1875 * (error & 255);
+          }
+          if (y < imgData.height - 1) { // (x, y+1)
+            imgData.data[((y + 1) * imgData.width + x) << 2] += 0.3125 * (error >> 16);
+            imgData.data[((y + 1) * imgData.width + x) << 2 + 1] += 0.3125 * (error >> 8 & 255);
+            imgData.data[((y + 1) * imgData.width + x) << 2 + 2] += 0.3125 * (error & 255);
+          }
+          if ((x < imgData.width - 1) && (y < imgData.height - 1)) { // (x+1, y+1)
+            imgData.data[((y + 1) * imgData.width + x + 1) << 2] += 0.0625 * (error >> 16);
+            imgData.data[((y + 1) * imgData.width + x + 1) << 2 + 1] += 0.0625 * (error >> 8 & 255);
+            imgData.data[((y + 1) * imgData.width + x + 1) << 2 + 2] += 0.0625 * (error & 255);
+          }
+          break;
+        case "Floyd–Steinberg (bitwise operations)":
+          error = ((oldColour >> 16) - (closestColour >> 16)) << 16
+            + ((oldColour >> 8 & 255) - (closestColour >> 8 & 255)) << 8
+            + (oldColour & 255) - (closestColour & 255); // Calculate the difference between the old colour and the closest colour
+
+          // Apply the error to the neighbouring pixels
+          if (x < imgData.width - 1) { // (x+1, y)
+            imgData.data[(y * imgData.width + x + 1) << 2] += 7 * (error >> 16) >> 4;
+            imgData.data[(y * imgData.width + x + 1) << 2 + 1] += 7 * (error >> 8 & 255 >> 4);
+            imgData.data[(y * imgData.width + x + 1) << 2 + 2] += 7 * (error & 255) >> 4;
+          }
+          if ((x > 0) && (y < imgData.height - 1)) { // (x-1, y+1)
+            imgData.data[((y + 1) * imgData.width + x - 1) << 2] += 3 * (error >> 16) >> 4;
+            imgData.data[((y + 1) * imgData.width + x - 1) << 2 + 1] += 3 * (error >> 8 & 255) >> 4;
+            imgData.data[((y + 1) * imgData.width + x - 1) << 2 + 2] += 3 * (error & 255) >> 4;
+          }
+          if (y < imgData.height - 1) { // (x, y+1)
+            imgData.data[((y + 1) * imgData.width + x) << 2] += 5 * (error >> 16) >> 4;
+            imgData.data[((y + 1) * imgData.width + x) << 2 + 1] += 5 * (error >> 8 & 255) >> 4;
+            imgData.data[((y + 1) * imgData.width + x) << 2 + 2] += 5 * (error & 255) >> 4;
+          }
+          if ((x < imgData.width - 1) && (y < imgData.height - 1)) { // (x+1, y+1)
+            imgData.data[((y + 1) * imgData.width + x + 1) << 2] += (error >> 16) >> 4;
+            imgData.data[((y + 1) * imgData.width + x + 1) << 2 + 1] += (error >> 8 & 255) >> 4;
+            imgData.data[((y + 1) * imgData.width + x + 1) << 2 + 2] += (error & 255) >> 4;
+          }
+          break;
+        case "Floyd–Steinberg (failed attempt, floating-point arithmetics)":
           error = (oldColour >> 16) - (closestColour >> 16)
             + (oldColour >> 8 & 255) - (closestColour >> 8 & 255)
             + (oldColour & 255) - (closestColour & 255); // Calculate the difference between the old colour and the closest colour
@@ -589,7 +630,7 @@ function quantizeData (imgData, palette) {
             imgData.data[((y + 1) * imgData.width + x + 1) << 2 + 2] += 0.0625 * (error & 255);
           }
           break;
-        case "Floyd–Steinberg (bitwise operations)":
+        case "Floyd–Steinberg (failed attempt, bitwise operations)":
           error = (oldColour >> 16) - (closestColour >> 16)
             + (oldColour >> 8 & 255) - (closestColour >> 8 & 255)
             + (oldColour & 255) - (closestColour & 255); // Calculate the difference between the old colour and the closest colour
