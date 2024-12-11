@@ -220,7 +220,7 @@ let palettePresets = {
   "4-bit grayscale": "000000111111222222333333444444555555666666777777888888999999aaaaaabbbbbbccccccddddddeeeeeeffffff",
   "3-bit RGB": "0000000000ff00ff0000ffffff0000ff00ffffff00ffffff",
   "Demo legacy": "000000808080ffffffffc0cbff0000ffa500ffff0000ff0000800000ffff0000ff000080800080ff00ffe6e6fa",
-  "Conifer": "0000000000aa00aa0000aaaaaa0000aa00aaaaaa00aaaaaa5555555555ff55ff5555ffffff5555ff55ffffff55ffffff",
+  "Conifer": "000000aa000000aa00aaaa000000aaaa00aa00aaaaaaaaaa555555ff555555ff55ffff555555ffff55ff55ffffffffff",
   "Minecraft dye colours (text)": "FFFFFFFF681FFF00FF9AC0CDFFFF00BFFF00FF69B4808080D3D3D300FFFFA020F00000FF8B451300FF00FF0000000000",
   "Minecraft dye colours (entities)": "1D1D21B02E265E7C168354323C44AA8932B8169C9C9D9D97474F52F38BAA80C71FFED83D3AB3DAC74EBDF9801DF9FFFE",
   "r/place 2023 8 colours": "FF4500FFA800FFD63500A3683690EAB44AC0000000FFFFFF",
@@ -228,6 +228,30 @@ let palettePresets = {
   "r/place 2022-2023 24 colours": "BE0039FF4500FFA800FFD63500A36800CC787EED5600756F009EAA2450A43690EA51E9F4493AC16A5CFF811E9FB44AC0FF3881FF99AA6D482F9C6926000000898D90D4D7D9FFFFFF",
   "r/place 2022-2023 32 colours": "6D001ABE0039FF4500FFA800FFD635FFF8B800A36800CC787EED5600756F009EAA00CCC02450A43690EA51E9F4493AC16A5CFF94B3FF811E9FB44AC0E4ABFFDE107FFF3881FF99AA6D482F9C6926FFB470000000515252898D90D4D7D9FFFFFF",
   "r/place 2017": "FFFFFFE4E4E4888888222222FFA7D1E50000E59500A06A42E5D90094E04402BE0100E5F00083C70000EAE04AFF820080"
+};
+
+let RGBtoYCbCr = function (RGB) {
+  let r = RGB >> 16,
+    g = RGB >> 8 & 255,
+	b = RGB & 255;
+
+  let Y = 0.299 * r + 0.587 * g + 0.114 * b;
+  let Cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
+  let Cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+
+  return (Y << 16) + (Cb << 8) + Cr;
+};
+
+let YCbCrtoRGB = function (YCbCr) {
+  let Y = YCbCr >> 16,
+    Cb = YCbCr >> 8 & 255,
+	Cr = YCbCr & 255;
+
+  let r = Y + 1.402 * (Cr - 128);
+  let g = Y - 0.344136 * (Cb - 128) - 0.714136 * (Cr - 128);
+  let b = Y + 1.772 * (Cb - 128);
+
+  return (r << 16) + (g << 8) + n;
 };
 </script>
 <script>
@@ -520,7 +544,19 @@ function quantizeData (imgData, palette) {
       let oldColour = (imgData.data[pixelIndex] << 16)
         + (imgData.data[pixelIndex + 1] << 8)
         + imgData.data[pixelIndex + 2]; // Get the colour of the current pixel
-      let closestColour = findMin(palette, (c) => distance(c, oldColour)); // Find the closest color in the palette
+
+      let closestColour;
+      switch (document.getElementById("quantization-algorithm").value) {
+        case "YCbCr straight-line distance":
+          oldColour = RGBtoYCbCr(oldColour);
+          let YCbCrPalette = palette.map(RGBtoYCbCr);
+
+          closestColour = findMin(palette, (c) => distance(c, oldColour)); // Find the closest color in the palette
+          break;
+        default: // RGB straight-line distance
+          closestColour = findMin(palette, (c) => distance(c, oldColour)); // Find the closest color in the palette
+          break;
+      }
       // encodedString[pixelIndex] = palette.indexOf(closestColour);
       encodedString = encodedString.concat(palette.indexOf(closestColour).toString(36));
       let error;
@@ -599,7 +635,9 @@ function quantizeData (imgData, palette) {
 }
 
 document.getElementById("refresh").addEventListener("click", async () => {
-  await renderImage(document.getElementById("uploadInput").files[0]);
+  if (typeof document.getElementById("uploadInput").files[0] != "undefined") {
+    await renderImage(document.getElementById("uploadInput").files[0]);
+  }
 });
 
 document.getElementById("isQuantized").addEventListener("input", (ev) => {
