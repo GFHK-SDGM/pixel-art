@@ -128,6 +128,7 @@ input[type=color] {
     <select id="quantization-algorithm">
       <option>RGB straight-line distance</option>
       <option>YCbCr straight-line distance</option>
+      <option>Gamma corrected</option>
     </select>
   </div>
   <div id="dithering-algorithm-container">
@@ -286,37 +287,37 @@ async function displayPhoto(imgData, el = photoContainer) {
 
   if (img.width < img.height) { // portrait
     if (img.width < 50) {
-      img.style.transform = `scale(8)`;
+      img.style.transform = "scale(8)";
       el.style.width = `${img.width << 3}px`;
       el.style.height = `${img.height << 3}px`;
     } else if (img.width < 100) {
-      img.style.transform = `scale(4)`;
+      img.style.transform = "scale(4)";
       el.style.width = `${img.width << 2}px`;
       el.style.height = `${img.height << 2}px`;
     } else if (img.width < 200) {
-      img.style.transform = `scale(2)`;
+      img.style.transform = "scale(2)";
       el.style.width = `${img.width << 1}px`;
       el.style.height = `${img.height << 1}px`;
     } else if (img.width < 400) {
-      // img.style.transform = `scale(2)`;
+      // img.style.transform = "scale(2)";
       // el.style.width = `${img.width << 1}px`;
       // el.style.height = `${img.height << 1}px`;
     }
   } else { // landscape
     if (img.height < 50) {
-      img.style.transform = `scale(8)`;
+      img.style.transform = "scale(8)";
       el.style.width = `${img.width << 3}px`;
       el.style.height = `${img.height << 3}px`;
     } else if (img.height < 100) {
-      img.style.transform = `scale(4)`;
+      img.style.transform = "scale(4)";
       el.style.width = `${img.width << 2}px`;
       el.style.height = `${img.height << 2}px`;
     } else if (img.height < 200) {
-      img.style.transform = `scale(2)`;
+      img.style.transform = "scale(2)";
       el.style.width = `${img.width << 1}px`;
       el.style.height = `${img.height << 1}px`;
     } else if (img.height < 400) {
-      // img.style.transform = `scale(2)`;
+      // img.style.transform = "scale(2)";
       // el.style.width = `${img.width << 1}px`;
       // el.style.height = `${img.height << 1}px`;
     }
@@ -503,7 +504,8 @@ async function resizeImage(imgData) {
 function quantizeData (imgData, palette) {
   encodedString = "";
 
-  let newImgDataArray = new Uint8Array(imgData.data.length);
+  let newImgDataArray = new Uint8ClampedArray(imgData.data.length);
+  let newImgDataArray2 = new Uint8Array(imgData.data.length);
 
   /*
   let distance = function (a1, a2, a3, b1, b2, b3) {
@@ -550,8 +552,8 @@ function quantizeData (imgData, palette) {
 
       switch (document.getElementById("dithering-algorithm").value) {
         case "Floyd–Steinberg (floating-point arithmetics)":
-          error = ((oldColour >> 16) - (closestColour >> 16)) << 16
-            + ((oldColour >> 8 & 255) - (closestColour >> 8 & 255)) << 8
+          error = (oldColour & 16711680) - (closestColour & 16711680)
+            + (oldColour & 65280) - (closestColour & 65280)
             + (oldColour & 255) - (closestColour & 255); // Calculate the difference between the old colour and the closest colour
 
           // Apply the error to the neighbouring pixels
@@ -577,14 +579,14 @@ function quantizeData (imgData, palette) {
           }
           break;
         case "Floyd–Steinberg (bitwise operations)":
-          error = ((oldColour >> 16) - (closestColour >> 16)) << 16
-            + ((oldColour >> 8 & 255) - (closestColour >> 8 & 255)) << 8
+          error = (oldColour & 16711680) - (closestColour & 16711680)
+            + (oldColour & 65280) - (closestColour & 65280)
             + (oldColour & 255) - (closestColour & 255); // Calculate the difference between the old colour and the closest colour
 
           // Apply the error to the neighbouring pixels
           if (x < imgData.width - 1) { // (x+1, y)
             imgData.data[(y * imgData.width + x + 1) << 2] += 7 * (error >> 16) >> 4;
-            imgData.data[(y * imgData.width + x + 1) << 2 + 1] += 7 * (error >> 8 & 255 >> 4);
+            imgData.data[(y * imgData.width + x + 1) << 2 + 1] += 7 * (error >> 8 & 255) >> 4;
             imgData.data[(y * imgData.width + x + 1) << 2 + 2] += 7 * (error & 255) >> 4;
           }
           if ((x > 0) && (y < imgData.height - 1)) { // (x-1, y+1)
@@ -638,7 +640,7 @@ function quantizeData (imgData, palette) {
           // Apply the error to the neighbouring pixels
           if (x < imgData.width - 1) { // (x+1, y)
             imgData.data[(y * imgData.width + x + 1) << 2] += 7 * (error >> 16) >> 4;
-            imgData.data[(y * imgData.width + x + 1) << 2 + 1] += 7 * (error >> 8 & 255 >> 4);
+            imgData.data[(y * imgData.width + x + 1) << 2 + 1] += 7 * (error >> 8 & 255) >> 4;
             imgData.data[(y * imgData.width + x + 1) << 2 + 2] += 7 * (error & 255) >> 4;
           }
           if ((x > 0) && (y < imgData.height - 1)) { // (x-1, y+1)
@@ -661,13 +663,41 @@ function quantizeData (imgData, palette) {
           break;
       }
 
-      // newImgDataArray[y * imgData.width + x] = palette[(y * imgData.width + x) % palette.length]; // Set the new pixel colour in the new image
-      newImgDataArray[pixelIndex] = closestColour >> 16;
+      newImgDataArray[pixelIndex] = closestColour >> 16; // Set the new pixel colour in the new image
       newImgDataArray[pixelIndex + 1] = closestColour >> 8 & 255;
       newImgDataArray[pixelIndex + 2] = closestColour & 255;
       // newImgDataArray[pixelIndex + 3] = 255;
       newImgDataArray[pixelIndex + 3] = imgData.data[pixelIndex + 3]; // Put the original alpha values onto the new iamge data
+
+      switch (document.getElementById("dithering-algorithm").value) {
+        case "Floyd–Steinberg (failed attempt, floating-point arithmetics)":
+          newImgDataArray2[pixelIndex] = closestColour >> 16;
+          newImgDataArray2[pixelIndex + 1] = closestColour >> 8 & 255;
+          newImgDataArray2[pixelIndex + 2] = closestColour & 255;
+          newImgDataArray2[pixelIndex + 3] = imgData.data[pixelIndex + 3];
+          break;
+        case "Floyd–Steinberg (failed attempt, bitwise operations)":
+          newImgDataArray2[pixelIndex] = closestColour >> 16;
+          newImgDataArray2[pixelIndex + 1] = closestColour >> 8 & 255;
+          newImgDataArray2[pixelIndex + 2] = closestColour & 255;
+          newImgDataArray2[pixelIndex + 3] = imgData.data[pixelIndex + 3];
+          break;
+      }
     }
+  }
+
+  let newImgData2;
+  switch (document.getElementById("dithering-algorithm").value) {
+    case "Floyd–Steinberg (failed attempt, floating-point arithmetics)":
+      newImgData2 = new ImageData(imgData.width, imgData.height);
+      newImgData2.data.set(newImgDataArray2);
+      return newImgData2;
+      break;
+    case "Floyd–Steinberg (failed attempt, bitwise operations)":
+      newImgData2 = new ImageData(imgData.width, imgData.height);
+      newImgData2.data.set(newImgDataArray2);
+      return newImgData2;
+      break;
   }
 
   let newImgData = new ImageData(imgData.width, imgData.height);
