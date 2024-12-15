@@ -548,13 +548,15 @@ function quantizeData (imgData, palette) {
       }
       // encodedString[pixelIndex] = palette.indexOf(closestColour);
       encodedString = encodedString.concat(palette.indexOf(closestColour).toString(36));
-      let error;
 
+      let error;
+      let errorArray = new Uint8ClampedArray(3);
       switch (document.getElementById("dithering-algorithm").value) {
         case "Floyd–Steinberg (floating-point arithmetics)":
-          error = (oldColour & 16711680) - (closestColour & 16711680)
-            + (oldColour & 65280) - (closestColour & 65280)
-            + (oldColour & 255) - (closestColour & 255); // Calculate the difference between the old colour and the closest colour
+          errorArray[0] = (oldColour >> 16) - (closestColour >> 16); // Calculate the difference between the old colour and the closest colour
+          errorArray[1] = (oldColour >> 8 & 255) - (closestColour >> 8 & 255);
+          errorArray[2] = (oldColour & 255) - (closestColour & 255);
+          error = (errorArray[0] << 16) + (errorArray[1] << 8) + errorArray[2];
 
           // Apply the error to the neighbouring pixels
           if (x < imgData.width - 1) { // (x+1, y)
@@ -579,9 +581,10 @@ function quantizeData (imgData, palette) {
           }
           break;
         case "Floyd–Steinberg (bitwise operations)":
-          error = (oldColour & 16711680) - (closestColour & 16711680)
-            + (oldColour & 65280) - (closestColour & 65280)
-            + (oldColour & 255) - (closestColour & 255); // Calculate the difference between the old colour and the closest colour
+          errorArray[0] = (oldColour >> 16) - (closestColour >> 16); // Calculate the difference between the old colour and the closest colour
+          errorArray[1] = (oldColour >> 8 & 255) - (closestColour >> 8 & 255);
+          errorArray[2] = (oldColour & 255) - (closestColour & 255);
+          error = (errorArray[0] << 16) + (errorArray[1] << 8) + errorArray[2];
 
           // Apply the error to the neighbouring pixels
           if (x < imgData.width - 1) { // (x+1, y)
