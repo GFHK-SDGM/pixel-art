@@ -381,7 +381,7 @@ let renderImage = async function (file) {
     });
 
     paletteList = paletteList.slice(0, -1); // Remove extra “undefined”
-    paletteList.forEach((e, i) => {
+    paletteList.forEach((_, i) => {
       paletteList[i] = parseInt(paletteList[i].slice(1), 16); // Convert to integer
     });
     // console.info(paletteList);
@@ -554,58 +554,60 @@ function quantizeData (imgData, palette) {
       switch (document.getElementById("dithering-algorithm").value) {
         case "Floyd–Steinberg (floating-point arithmetics)":
           errorArray[0] = (oldColour >> 16) - (closestColour >> 16); // Calculate the difference between the old colour and the closest colour
-          errorArray[1] = (oldColour >> 8 & 255) - (closestColour >> 8 & 255);
+          // errorArray[1] = (oldColour >> 8 & 255) - (closestColour >> 8 & 255);
+          errorArray[1] = (oldColour & 65280) - (closestColour & 65280) >> 8;
           errorArray[2] = (oldColour & 255) - (closestColour & 255);
           error = (errorArray[0] << 16) + (errorArray[1] << 8) + errorArray[2];
 
           // Apply the error to the neighbouring pixels
           if (x < imgData.width - 1) { // (x+1, y)
             imgData.data[(y * imgData.width + x + 1) << 2] += 0.4375 * (error >> 16);
-            imgData.data[(y * imgData.width + x + 1) << 2 + 1] += 0.4375 * (error >> 8 & 255);
-            imgData.data[(y * imgData.width + x + 1) << 2 + 2] += 0.4375 * (error & 255);
+            imgData.data[((y * imgData.width + x + 1) << 2) + 1] += 0.4375 * (error >> 8 & 255);
+            imgData.data[((y * imgData.width + x + 1) << 2) + 2] += 0.4375 * (error & 255);
           }
           if ((x > 0) && (y < imgData.height - 1)) { // (x-1, y+1)
             imgData.data[((y + 1) * imgData.width + x - 1) << 2] += 0.1875 * (error >> 16);
-            imgData.data[((y + 1) * imgData.width + x - 1) << 2 + 1] += 0.1875 * (error >> 8 & 255);
-            imgData.data[((y + 1) * imgData.width + x - 1) << 2 + 2] += 0.1875 * (error & 255);
+            imgData.data[(((y + 1) * imgData.width + x - 1) << 2) + 1] += 0.1875 * (error >> 8 & 255);
+            imgData.data[(((y + 1) * imgData.width + x - 1) << 2) + 2] += 0.1875 * (error & 255);
           }
           if (y < imgData.height - 1) { // (x, y+1)
             imgData.data[((y + 1) * imgData.width + x) << 2] += 0.3125 * (error >> 16);
-            imgData.data[((y + 1) * imgData.width + x) << 2 + 1] += 0.3125 * (error >> 8 & 255);
-            imgData.data[((y + 1) * imgData.width + x) << 2 + 2] += 0.3125 * (error & 255);
+            imgData.data[(((y + 1) * imgData.width + x) << 2) + 1] += 0.3125 * (error >> 8 & 255);
+            imgData.data[(((y + 1) * imgData.width + x) << 2) + 2] += 0.3125 * (error & 255);
           }
           if ((x < imgData.width - 1) && (y < imgData.height - 1)) { // (x+1, y+1)
             imgData.data[((y + 1) * imgData.width + x + 1) << 2] += 0.0625 * (error >> 16);
-            imgData.data[((y + 1) * imgData.width + x + 1) << 2 + 1] += 0.0625 * (error >> 8 & 255);
-            imgData.data[((y + 1) * imgData.width + x + 1) << 2 + 2] += 0.0625 * (error & 255);
+            imgData.data[(((y + 1) * imgData.width + x + 1) << 2) + 1] += 0.0625 * (error >> 8 & 255);
+            imgData.data[(((y + 1) * imgData.width + x + 1) << 2) + 2] += 0.0625 * (error & 255);
           }
           break;
         case "Floyd–Steinberg (bitwise operations)":
           errorArray[0] = (oldColour >> 16) - (closestColour >> 16); // Calculate the difference between the old colour and the closest colour
-          errorArray[1] = (oldColour >> 8 & 255) - (closestColour >> 8 & 255);
+          // errorArray[1] = (oldColour >> 8 & 255) - (closestColour >> 8 & 255);
+          errorArray[1] = (oldColour & 65280) - (closestColour & 65280) >> 8;
           errorArray[2] = (oldColour & 255) - (closestColour & 255);
           error = (errorArray[0] << 16) + (errorArray[1] << 8) + errorArray[2];
 
           // Apply the error to the neighbouring pixels
           if (x < imgData.width - 1) { // (x+1, y)
             imgData.data[(y * imgData.width + x + 1) << 2] += 7 * (error >> 16) >> 4;
-            imgData.data[(y * imgData.width + x + 1) << 2 + 1] += 7 * (error >> 8 & 255) >> 4;
-            imgData.data[(y * imgData.width + x + 1) << 2 + 2] += 7 * (error & 255) >> 4;
+            imgData.data[((y * imgData.width + x + 1) << 2) + 1] += 7 * (error >> 8 & 255) >> 4;
+            imgData.data[((y * imgData.width + x + 1) << 2) + 2] += 7 * (error & 255) >> 4;
           }
           if ((x > 0) && (y < imgData.height - 1)) { // (x-1, y+1)
             imgData.data[((y + 1) * imgData.width + x - 1) << 2] += 3 * (error >> 16) >> 4;
-            imgData.data[((y + 1) * imgData.width + x - 1) << 2 + 1] += 3 * (error >> 8 & 255) >> 4;
-            imgData.data[((y + 1) * imgData.width + x - 1) << 2 + 2] += 3 * (error & 255) >> 4;
+            imgData.data[(((y + 1) * imgData.width + x - 1) << 2) + 1] += 3 * (error >> 8 & 255) >> 4;
+            imgData.data[(((y + 1) * imgData.width + x - 1) << 2) + 2] += 3 * (error & 255) >> 4;
           }
           if (y < imgData.height - 1) { // (x, y+1)
             imgData.data[((y + 1) * imgData.width + x) << 2] += 5 * (error >> 16) >> 4;
-            imgData.data[((y + 1) * imgData.width + x) << 2 + 1] += 5 * (error >> 8 & 255) >> 4;
-            imgData.data[((y + 1) * imgData.width + x) << 2 + 2] += 5 * (error & 255) >> 4;
+            imgData.data[(((y + 1) * imgData.width + x) << 2) + 1] += 5 * (error >> 8 & 255) >> 4;
+            imgData.data[(((y + 1) * imgData.width + x) << 2) + 2] += 5 * (error & 255) >> 4;
           }
           if ((x < imgData.width - 1) && (y < imgData.height - 1)) { // (x+1, y+1)
             imgData.data[((y + 1) * imgData.width + x + 1) << 2] += (error >> 16) >> 4;
-            imgData.data[((y + 1) * imgData.width + x + 1) << 2 + 1] += (error >> 8 & 255) >> 4;
-            imgData.data[((y + 1) * imgData.width + x + 1) << 2 + 2] += (error & 255) >> 4;
+            imgData.data[(((y + 1) * imgData.width + x + 1) << 2) + 1] += (error >> 8 & 255) >> 4;
+            imgData.data[(((y + 1) * imgData.width + x + 1) << 2) + 2] += (error & 255) >> 4;
           }
           break;
         case "Floyd–Steinberg (failed attempt, floating-point arithmetics)":
