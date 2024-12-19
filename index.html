@@ -120,6 +120,10 @@ input[type=color] {
   <div id="errorMessage"></div>
   <div id="photoContainer"></div>
   <div>
+    <button id="save-btn">Save Image</button>
+    <button id="share-btn">Share Image</button>
+  </div>
+  <div>
     <label for="isQuantized">Quantize the image</label>
     <input type="checkbox" id="isQuantized" checked>
   </div>
@@ -328,6 +332,7 @@ function clearErrorMessage(el = errorMessage) {
 
 function displayErrorMessage(message, el = errorMessage) {
   el.textContent = message;
+  console.error(message);
 }
 
 document.getElementById("max-width").addEventListener("input", (ev) => {
@@ -421,7 +426,6 @@ document.getElementById("captureButton").addEventListener("click", () => {
         const ctx = cnv.getContext("2d");
         ctx.drawImage(video, 0, 0, cnv.width, cnv.height);
 
-        let resizedImgData = await resizeImage(ctx.getImageData(0, 0, cnv.width, cnv.height));
         cnv.toBlob(async (blob) => await renderImage(blob), "image/webp");
 
         mediaStream.getTracks().forEach(function (track) {
@@ -792,7 +796,7 @@ document.getElementById("copyToClipboard").addEventListener("click", () => {
   }, 5000);
 });
 
-let saveFile = (blob, filename) => {
+let saveFile = (blob, filename = "") => {
   const a = document.createElement("a");
   a.download = filename;
   a.href = URL.createObjectURL(blob);
@@ -801,6 +805,39 @@ let saveFile = (blob, filename) => {
   });
   a.click();
 };
+
+let saveDataURL = (url, filename = "") => {
+  const a = document.createElement("a");
+  a.download = filename;
+  a.href = url;
+  a.click();
+};
+
+document.getElementById("save-btn").addEventListener("click", () => {
+  saveDataURL(document.querySelector("#photoContainer > img").src);
+});
+
+document.getElementById("share-btn").addEventListener("click", async () => {
+  const img = document.querySelector("#photoContainer > img");
+  if (!img) {
+    displayErrorMessage("No image to share.");
+    return;
+  }
+  const cnv = document.createElement("canvas");
+  cnv.width = img.width;
+  cnv.height = img.height;
+  cnv.getContext("2d").drawImage(img, 0, 0);
+  let blob;
+  await cnv.toBlob((b) => {blob = b;}, "image/png");
+
+  try {
+    await navigator.share({
+      files: [new File([blob], "image.png")]
+    });
+  } catch (err) {
+    displayErrorMessage(`Error when sharing image: ${err}`);
+  }
+});
 </script>
 </body>
 </html>
