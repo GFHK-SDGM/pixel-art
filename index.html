@@ -114,6 +114,10 @@ input[type=color] {
     <label for="max-height">Max. height:</label>
     <input type="text" id="max-height" value="40">
   </div>
+  <div>
+    <label for="preserveAspectRatio">Preserve aspect ratio</label>
+    <input type="checkbox" id="preserveAspectRatio" checked>
+  </div>
   <button id="captureButton">Take a Photo</button>
   <button id="uploadButton" disabled>Upload Image</button>
   <button id="refresh">Refresh Image</button>
@@ -229,7 +233,7 @@ let palettePresets = {
   "3-bit RGB": "0000000000ff00ff0000ffffff0000ff00ffffff00ffffff",
   "6-bit RGB": "0000000000550000aa0000ff0055000055550055aa0055ff00aa0000aa5500aaaa00aaff00ff0000ff5500ffaa00ffff5500005500555500aa5500ff5555005555555555aa5555ff55aa0055aa5555aaaa55aaff55ff0055ff5555ffaa55ffffaa0000aa0055aa00aaaa00ffaa5500aa5555aa55aaaa55ffaaaa00aaaa55aaaaaaaaaaffaaff00aaff55aaffaaaaffffff0000ff0055ff00aaff00ffff5500ff5555ff55aaff55ffffaa00ffaa55ffaaaaffaaffffff00ffff55ffffaaffffff",
   "Demo legacy": "000000808080ffffffffc0cbff0000ffa500ffff0000ff0000800000ffff0000ff000080800080ff00ffe6e6fa",
-  "Conifer": "000000aa000000aa00aaaa000000aaaa00aa00aaaaaaaaaa555555ff555555ff55ffff555555ffff55ff55ffffffffff",
+  "Conifer": "000000aa000000aa00aa55000000aaaa00aa00aaaaaaaaaa555555ff555555ff55ffff555555ffff55ff55ffffffffff",
   "Minecraft dye colours (text)": "FFFFFFFF681FFF00FF9AC0CDFFFF00BFFF00FF69B4808080D3D3D300FFFFA020F00000FF8B451300FF00FF0000000000",
   "Minecraft dye colours (entities)": "1D1D21B02E265E7C168354323C44AA8932B8169C9C9D9D97474F52F38BAA80C71FFED83D3AB3DAC74EBDF9801DF9FFFE",
   "r/place 2023 8 colours": "FF4500FFA800FFD63500A3683690EAB44AC0000000FFFFFF",
@@ -374,7 +378,7 @@ let renderImage = async function (file) {
   ctx.drawImage(bmp, 0, 0);
 
   let imgData = ctx.getImageData(0, 0, bmp.width, bmp.height);
-  let resizedImgData = await resizeImage(imgData);
+  let resizedImgData = await resizeImage(imgData, document.getElementById("preserveAspectRatio").checked);
   if (document.getElementById("isQuantized").checked) {
     let paletteList = [];
     Array.from(document.getElementById("palette").children).forEach((e, i) => {
@@ -440,7 +444,7 @@ document.getElementById("captureButton").addEventListener("click", () => {
   });
 });
 
-async function resizeImage(imgData) {
+async function resizeImage(imgData, preserveAspectRatio = true) {
   const MAX_WIDTH = document.getElementById("max-width").value;
   const MAX_HEIGHT = document.getElementById("max-height").value;
   let width, height;
@@ -456,16 +460,21 @@ async function resizeImage(imgData) {
     height = imgData.height;
   }
 
-  if (width > height) {
-    if (width > MAX_WIDTH) {
-      height *= MAX_WIDTH / width;
-      width = MAX_WIDTH;
+  if (preserveAspectRatio) {
+    if (width > height) {
+      if (width > MAX_WIDTH) {
+        height *= MAX_WIDTH / width;
+        width = MAX_WIDTH;
+      }
+    } else {
+      if (height > MAX_HEIGHT) {
+        width *= MAX_HEIGHT / height;
+        height = MAX_HEIGHT;
+      }
     }
   } else {
-    if (height > MAX_HEIGHT) {
-      width *= MAX_HEIGHT / height;
-      height = MAX_HEIGHT;
-    }
+    width = document.getElementById("max-width").value;
+	height = document.getElementById("max-height").value;
   }
 
   const cnv = document.createElement("canvas");
@@ -484,6 +493,28 @@ async function resizeImage(imgData) {
 
   return ctx.getImageData(0, 0, width, height);
   // return cnv.toDataURL("image/webp");
+}
+
+function zoomImage(imgData, scaleX = 8, scaleY = 8) {
+  let newImgDataArray = new Uint8ClampedArray(imgData.data.length * scaleX * scaleY);
+
+  for (let y = 0; y < imgData.height; y++) {
+    for (let x = 0; x < imgData.width; x++) {
+      let pixelIndex = (y * imgData.width + x) << 2;
+      for (let i = 0; i < scaleY; i++) {
+        for (let j = 0; j < scaleX; j++) {
+          newImgDataArray[pixelIndex + i * imgData.width + j] = imgData.data[pixelIndex];
+          newImgDataArray[pixelIndex + i * imgData.width + j + 1] = imgData.data[pixelIndex + 1];
+          newImgDataArray[pixelIndex + i * imgData.width + j + 2] = imgData.data[pixelIndex + 2];
+          newImgDataArray[pixelIndex + i * imgData.width + j + 3] = imgData.data[pixelIndex + 3];
+        }
+      }
+    }
+  }
+
+  let newImgData = new ImageData(imgData.width * scaleX, imgData.height * scaleY);
+  newImgData.data.set(newImgDataArray);
+  return newImgData;
 }
 
 function quantizeData (imgData, palette) {
@@ -826,7 +857,8 @@ document.getElementById("share-btn").addEventListener("click", async () => {
   const cnv = document.createElement("canvas");
   cnv.width = img.width;
   cnv.height = img.height;
-  cnv.getContext("2d").drawImage(img, 0, 0);
+  // cnv.getContext("2d").drawImage(img, 0, 0);
+  cnv.getContext("2d").putImageData(zoomImage(img), 0, 0);
   let blob;
   await cnv.toBlob((b) => {blob = b;}, "image/png");
 
