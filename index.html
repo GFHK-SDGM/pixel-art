@@ -174,6 +174,7 @@ input[type=color] {
       <option>6-bit RGB</option>
       <option>Demo legacy</option>
       <option>Conifer</option>
+      <option>Less than GIF</option>
       <option>Minecraft dye colours (text)</option>
       <option>Minecraft dye colours (entities)</option>
       <option>r/place 2023 8 colours</option>
@@ -273,6 +274,7 @@ let palettePresets = {
   "6-bit RGB": "0000000000550000aa0000ff0055000055550055aa0055ff00aa0000aa5500aaaa00aaff00ff0000ff5500ffaa00ffff5500005500555500aa5500ff5555005555555555aa5555ff55aa0055aa5555aaaa55aaff55ff0055ff5555ffaa55ffffaa0000aa0055aa00aaaa00ffaa5500aa5555aa55aaaa55ffaaaa00aaaa55aaaaaaaaaaffaaff00aaff55aaffaaaaffffff0000ff0055ff00aaff00ffff5500ff5555ff55aaff55ffffaa00ffaa55ffaaaaffaaffffff00ffff55ffffaaffffff",
   "Demo legacy": "000000808080ffffffffc0cbff0000ffa500ffff0000ff0000800000ffff0000ff000080800080ff00ffe6e6fa",
   "Conifer": "000000aa000000aa00aa55000000aaaa00aa00aaaaaaaaaa555555ff555555ff55ffff555555ffff55ff55ffffffffff",
+  "Less than GIF": "0000000000330000660000990000cc0000ff0033000033330033660033990033cc0033ff0066000066330066660066990066cc0066ff0099000099330099660099990099cc0099ff00cc0000cc3300cc6600cc9900cccc00ccff00ff0000ff3300ff6600ff9900ffcc00ffff3300003300333300663300993300cc3300ff3333003333333333663333993333cc3333ff3366003366333366663366993366cc3366ff3399003399333399663399993399cc3399ff33cc0033cc3333cc6633cc9933cccc33ccff33ff0033ff3333ff6633ff9933ffcc33ffff6600006600336600666600996600cc6600ff6633006633336633666633996633cc6633ff6666006666336666666666996666cc6666ff6699006699336699666699996699cc6699ff66cc0066cc3366cc6666cc9966cccc66ccff66ff0066ff3366ff6666ff9966ffcc66ffff9900009900339900669900999900cc9900ff9933009933339933669933999933cc9933ff9966009966339966669966999966cc9966ff9999009999339999669999999999cc9999ff99cc0099cc3399cc6699cc9999cccc99ccff99ff0099ff3399ff6699ff9999ffcc99ffffcc0000cc0033cc0066cc0099cc00cccc00ffcc3300cc3333cc3366cc3399cc33cccc33ffcc6600cc6633cc6666cc6699cc66cccc66ffcc9900cc9933cc9966cc9999cc99cccc99ffcccc00cccc33cccc66cccc99ccccccccccffccff00ccff33ccff66ccff99ccffccccffffff0000ff0033ff0066ff0099ff00ccff00ffff3300ff3333ff3366ff3399ff33ccff33ffff6600ff6633ff6666ff6699ff66ccff66ffff9900ff9933ff9966ff9999ff99ccff99ffffcc00ffcc33ffcc66ffcc99ffccccffccffffff00ffff33ffff66ffff99ffffccffffff",
   "Minecraft dye colours (text)": "FFFFFFFF681FFF00FF9AC0CDFFFF00BFFF00FF69B4808080D3D3D300FFFFA020F00000FF8B451300FF00FF0000000000",
   "Minecraft dye colours (entities)": "1D1D21B02E265E7C168354323C44AA8932B8169C9C9D9D97474F52F38BAA80C71FFED83D3AB3DAC74EBDF9801DF9FFFE",
   "r/place 2023 8 colours": "FF4500FFA800FFD63500A3683690EAB44AC0000000FFFFFF",
@@ -779,11 +781,11 @@ document.getElementById("option-preset").addEventListener("input", (ev) => {
 
       document.getElementById("binary-slice-start").value = 2;
       document.getElementById("binary-slice-end").value = 3901;
-    break;
-    case "Conifer decoder":
+      break;
+    default:
       document.getElementById("binary-slice-start").value = "";
       document.getElementById("binary-slice-end").value = "";
-    break;
+      break;
   }
 });
 
@@ -909,9 +911,9 @@ document.getElementById("download-binary").addEventListener("click", () => {
     });
 
     if (document.getElementById("binary-slice-end").value) {
-      arr.slice(document.getElementById("binary-slice-start").value, document.getElementById("binary-slice-end").value);
+      arr = arr.subarray(document.getElementById("binary-slice-start").value, document.getElementById("binary-slice-end").value);
     } else {
-      arr.slice(document.getElementById("binary-slice-start").value);
+      arr = arr.subarray(document.getElementById("binary-slice-start").value);
     }
 
     saveFile(new Blob([arr]), document.getElementById("download-binary-filename").value);
