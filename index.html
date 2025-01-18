@@ -107,6 +107,13 @@ input[type=color] {
 <div style="display: flex; flex-direction: column; align-items: center;">
   <input type="file" id="uploadInput" accept="image/*">
   <div>
+    <label for="option-preset">Option preset:</label>
+    <select id="option-preset">
+      <option>None</option>
+      <option>Conifer decoder</option>
+    </select>
+  </div>
+  <div>
     <label for="max-width">Max. width:</label>
     <input type="text" id="max-width" value="40">
   </div>
@@ -132,7 +139,7 @@ input[type=color] {
     <input type="checkbox" id="isQuantized" checked>
   </div>
   <div id="quantization-algorithm-container">
-    <p>Quantization algorithm:</p>
+    <label for="quantization-algorithm">Quantization algorithm:</label>
     <select id="quantization-algorithm">
       <option>RGB straight-line distance</option>
       <option>YCbCr straight-line distance</option>
@@ -140,7 +147,7 @@ input[type=color] {
     </select>
   </div>
   <div id="dithering-algorithm-container">
-    <p>Dithering algorithm:</p>
+    <label for="dithering-algorithm">Dithering algorithm:</label>
     <select id="dithering-algorithm">
       <option>Floyd–Steinberg (floating-point arithmetics)</option>
       <option>Floyd–Steinberg (bitwise operations)</option>
@@ -194,6 +201,7 @@ input[type=color] {
       <button id="copyToClipboard">Copy to Clipboard</button>
       <span class="popuptext" id="copy-popup">String copied!</span>
     </div>
+    <button id="download-binary" style="display: none;">Download binary file</button>
   </div>
 </div>
 <script>
@@ -474,7 +482,7 @@ async function resizeImage(imgData, preserveAspectRatio = true) {
     }
   } else {
     width = document.getElementById("max-width").value;
-	height = document.getElementById("max-height").value;
+    height = document.getElementById("max-height").value;
   }
 
   const cnv = document.createElement("canvas");
@@ -726,6 +734,19 @@ function quantizeData (imgData, palette) {
   return newImgData;
 }
 
+document.getElementById("option-preset").addEventListener("input", (ev) => {
+  switch (ev.target.value) {
+    case "Conifer decoder":
+      document.getElementById("max-width").value = "160";
+      document.getElementById("max-height").value = "50";
+      document.getElementById("preserveAspectRatio").checked = false;
+      document.getElementById("isQuantized").checked = true;
+      document.getElementById("palette-presets").value = "Conifer"; // selectedIndex = 6;
+      document.getElementById("palette-presets").dispatchEvent(new Event("input", { bubbles: true, cancelable: true }));
+    break;
+  }
+});
+
 document.getElementById("refresh").addEventListener("click", async () => {
   if (typeof document.getElementById("uploadInput").files[0] != "undefined") {
     await renderImage(document.getElementById("uploadInput").files[0]);
@@ -756,6 +777,13 @@ document.getElementById("palette-presets").addEventListener("input", (ev) => {
   document.getElementById("palette-text").innerText = "";
   document.getElementById("palette-text").appendChild(document.createTextNode(value));
   document.getElementById("import-palette").click();
+
+  if (ev.target.value == "Conifer") {
+    document.getElementById("download-binary").style.display = "block";
+  }
+  else {
+    document.getElementById("download-binary").style.display = "none";
+  }
 });
 
 document.getElementById("import-palette").addEventListener("click", () => {
@@ -825,6 +853,18 @@ document.getElementById("copyToClipboard").addEventListener("click", () => {
   setTimeout(() => {
     document.getElementById("copy-popup").classList.toggle("show");
   }, 5000);
+});
+
+document.getElementById("download-binary").addEventListener("click", () => {
+  if (document.getElementById("palette").children.length < 18) {
+    let arr = new Uint8Array(encodedString.length >> 1);
+    encodedString.match(/.{1,2}/g).forEach((e, i) => {
+      arr[i] = parseInt(e, 16);
+    });
+    saveFile(new Blob([arr]));
+  } else {
+    return;
+  }
 });
 
 let saveFile = (blob, filename = "") => {
