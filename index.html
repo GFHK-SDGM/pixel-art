@@ -194,14 +194,45 @@ input[type=color] {
       <span class="popuptext" id="copy-popup">String copied!</span>
     </div>
   </div>
+  <div>
+    <label for="append-mode">Append to existing encoded string</label>
+    <input type="checkbox" id="append-mode">
+  </div>
+  <!--
+  <div id="encoded-slice-option-container">
+    <p>Encoded string slice options:</p>
+    <div style="display: flex; flex-direction: row;">
+      <label for="encoded-slice-start">Start index:</label>
+      <input type="text" id="encoded-slice-start">
+    </div>
+    <div style="display: flex; flex-direction: row;">
+      <label for="encoded-slice-end">End index:</label>
+      <input type="text" id="encoded-slice-end">
+    </div>
+  </div>
+  -->
   <div style="display: flex; flex-direction: column; align-items: center;">
-    <label for="encoded">Encoded String:</label>
+    <label for="encoded">Encoded string:</label>
     <div id="encoded" style="font-family: monospace; font-size: 1rem; max-width: 70vw; max-height: 5rem; overflow-x: hidden; overflow-wrap: anywhere; border: 2px solid #ccc; border-radius: 10px; padding: 0.25rem;"></div>
     <div class="popup">
       <button id="copyToClipboard">Copy to Clipboard</button>
       <span class="popuptext" id="copy-popup">String copied!</span>
     </div>
-    <button id="download-binary" style="display: none;">Download binary file</button>
+  </div>
+  <div id="binary-slice-option-container" style="display: none;">
+    <p>Binary file slice options:</p>
+    <div style="display: flex; flex-direction: row;">
+      <label for="binary-slice-start">Start index:</label>
+      <input type="text" id="binary-slice-start">
+    </div>
+    <div style="display: flex; flex-direction: row;">
+      <label for="binary-slice-end">End index:</label>
+      <input type="text" id="binary-slice-end">
+    </div>
+  </div>
+  <div id="download-binary-container" style="display: none;">
+    <input type="text" id="download-binary-filename" placeholder="Filename">
+    <button id="download-binary">Download binary file</button>
   </div>
 </div>
 <script>
@@ -526,7 +557,8 @@ function zoomImage(imgData, scaleX = 8, scaleY = 8) {
 }
 
 function quantizeData (imgData, palette) {
-  encodedString = "";
+  if (!document.getElementById("append-mode").checked)
+    encodedString = "";
 
   let newImgDataArray = new Uint8ClampedArray(imgData.data.length);
   let newImgDataArray2 = new Uint8Array(imgData.data.length);
@@ -741,8 +773,16 @@ document.getElementById("option-preset").addEventListener("input", (ev) => {
       document.getElementById("max-height").value = "50";
       document.getElementById("preserveAspectRatio").checked = false;
       document.getElementById("isQuantized").checked = true;
+      document.getElementById("dithering-algorithm").value = "No dithering"; // selectedIndex = 5
       document.getElementById("palette-presets").value = "Conifer"; // selectedIndex = 6;
-      document.getElementById("palette-presets").dispatchEvent(new Event("input", { bubbles: true, cancelable: true }));
+      document.getElementById("palette-presets").dispatchEvent(new Event("input", { bubbles: true, cancelable: true })); // Force to load the palette preset
+
+      document.getElementById("binary-slice-start").value = 2;
+      document.getElementById("binary-slice-end").value = 3901;
+    break;
+    case "Conifer decoder":
+      document.getElementById("binary-slice-start").value = "";
+      document.getElementById("binary-slice-end").value = "";
     break;
   }
 });
@@ -779,10 +819,12 @@ document.getElementById("palette-presets").addEventListener("input", (ev) => {
   document.getElementById("import-palette").click();
 
   if (ev.target.value == "Conifer") {
-    document.getElementById("download-binary").style.display = "block";
+    document.getElementById("binary-slice-option-container").style.display = "block";
+    document.getElementById("download-binary-container").style.display = "block";
   }
   else {
-    document.getElementById("download-binary").style.display = "none";
+    document.getElementById("binary-slice-option-container").style.display = "none";
+    document.getElementById("download-binary-container").style.display = "none";
   }
 });
 
@@ -857,11 +899,22 @@ document.getElementById("copyToClipboard").addEventListener("click", () => {
 
 document.getElementById("download-binary").addEventListener("click", () => {
   if (document.getElementById("palette").children.length < 18) {
+    if (encodedString.slice(0, 4) != "087f") {
+      console.warn(`Warning: Invalid Conifer header: ${encodedString.slice(0, 4)}`);
+      displayErrorMessage(`Invalid Conifer header: ${encodedString.slice(0, 4)}`);
+    }
     let arr = new Uint8Array(encodedString.length >> 1);
     encodedString.match(/.{1,2}/g).forEach((e, i) => {
       arr[i] = parseInt(e, 16);
     });
-    saveFile(new Blob([arr]));
+
+    if (document.getElementById("binary-slice-end").value) {
+      arr.slice(document.getElementById("binary-slice-start").value, document.getElementById("binary-slice-end").value);
+    } else {
+      arr.slice(document.getElementById("binary-slice-start").value);
+    }
+
+    saveFile(new Blob([arr]), document.getElementById("download-binary-filename").value);
   } else {
     return;
   }
