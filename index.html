@@ -209,6 +209,10 @@ input[type=color] {
       <button id="copyPaletteToClipboard">Copy to Clipboard</button>
       <span class="popuptext" id="copy-popup">String copied!</span>
     </div>
+    <div class="popup">
+      <button id="copyPaletteToClipboard">Copy to Clipboard (format 2)</button>
+      <span class="popuptext" id="copy-popup">String copied!</span>
+    </div>
   </div>
   <div>
     <label for="append-mode">Append to existing encoded string</label>
@@ -779,6 +783,15 @@ function quantizeData (imgData, palette) {
       break;
   }
 
+ // Verify Conifer header
+  if (document.getElementById("palette-presets").value == "Conifer") {
+    if (encodedString.slice(0, 4) != "087f") {
+      console.warn(`Warning: Invalid Conifer header: ${encodedString.slice(0, 4)}`);
+      displayErrorMessage(`Invalid Conifer header: ${encodedString.slice(0, 4)}`);
+    }
+  }
+
+  // Apply slicing on the encoded string
   if (document.getElementById("encoded-slice-end").value) {
     newEncodedString = newEncodedString.slice(document.getElementById("encoded-slice-start").value, document.getElementById("encoded-slice-end").value);
   } else {
@@ -919,6 +932,14 @@ document.getElementById("copyPaletteToClipboard").addEventListener("click", () =
   }, 5000);
 });
 
+document.getElementById("copyPaletteToClipboard2").addEventListener("click", () => {
+  navigator.clipboard.writeText(document.getElementById("palette-text").textContent.match(/.{6}/g).join(",")
+  document.getElementById("copy-popup").classList.toggle("show");
+  setTimeout(() => {
+    document.getElementById("copy-popup").classList.toggle("show");
+  }, 5000);
+});
+
 document.getElementById("copyToClipboard").addEventListener("click", () => {
   navigator.clipboard.writeText(document.getElementById("encoded").textContent);
   document.getElementById("copy-popup").classList.toggle("show");
@@ -929,10 +950,6 @@ document.getElementById("copyToClipboard").addEventListener("click", () => {
 
 document.getElementById("download-binary").addEventListener("click", () => {
   if (document.getElementById("palette").children.length < 18) {
-    if (encodedString.slice(0, 4) != "087f") {
-      console.warn(`Warning: Invalid Conifer header: ${encodedString.slice(0, 4)}`);
-      displayErrorMessage(`Invalid Conifer header: ${encodedString.slice(0, 4)}`);
-    }
     let arr = new Uint8Array(encodedString.length >> 1);
     encodedString.match(/.{1,2}/g).forEach((e, i) => {
       arr[i] = parseInt(e, 16);
