@@ -210,7 +210,7 @@ input[type=color] {
       <span class="popuptext" id="copy-popup">String copied!</span>
     </div>
     <div class="popup">
-      <button id="copyPaletteToClipboard">Copy to Clipboard (format 2)</button>
+      <button id="copyPaletteToClipboard2">Copy to Clipboard (format 2)</button>
       <span class="popuptext" id="copy-popup">String copied!</span>
     </div>
   </div>
@@ -933,7 +933,7 @@ document.getElementById("copyPaletteToClipboard").addEventListener("click", () =
 });
 
 document.getElementById("copyPaletteToClipboard2").addEventListener("click", () => {
-  navigator.clipboard.writeText(document.getElementById("palette-text").textContent.match(/.{6}/g).join(",")
+  navigator.clipboard.writeText(document.getElementById("palette-text").textContent.match(/.{6}/g).join(","));
   document.getElementById("copy-popup").classList.toggle("show");
   setTimeout(() => {
     document.getElementById("copy-popup").classList.toggle("show");
