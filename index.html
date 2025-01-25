@@ -605,8 +605,11 @@ function quantizeData (imgData, palette) {
     return arr[minIndex];
   };
 
+  let totalTimePass = 0, totalIterations = 0;
+
   for (let y = 0; y < imgData.height; y++) {
     for (let x = 0; x < imgData.width; x++) {
+      let startTime = performance.now();
       let pixelIndex = (y * imgData.width + x) << 2;
       let oldColour = (imgData.data[pixelIndex] << 16)
         + (imgData.data[pixelIndex + 1] << 8)
@@ -626,6 +629,8 @@ function quantizeData (imgData, palette) {
       }
       // encodedString[pixelIndex] = palette.indexOf(closestColour);
       newEncodedString = newEncodedString.concat(palette.indexOf(closestColour).toString(36));
+      totalTimePass += performance.now() - startTime;
+      totalIterations ++;
 
       let error;
       let errorArray = new Uint8ClampedArray(3);
@@ -768,6 +773,7 @@ function quantizeData (imgData, palette) {
       }
     }
   }
+  console.debug(`${totalIterations} iterations passed spanning ${totalTimePass} ms. ${totalTimePass / totalIterations} ms on average.`);
 
   let newImgData2;
   switch (document.getElementById("dithering-algorithm").value) {
