@@ -281,6 +281,7 @@ let findIndexOfSmallestElement = function (arr) {
   return minIndex;
 };
 
+// Code referenced from ltgcgo/twinkle, licensed under GNU LGPL 3.0
 // (()=>{var s=class extends EventTarget{static sleep(t){return new Promise(e=>{self.AbortSignal?AbortSignal.timeout(t).addEventListener("abort",e):setTimeout(e,t)})}#s;#e;#t=!1;get finished(){return this.#t}finish(){this.#t=!0,this.#e&&this.#e()}wait(){if(!this.#t)return this.#s}constructor(){super(),this.#s=new Promise(t=>{this.#e=()=>{this.#t=!0,t()}})}},i=s;self.miniSignal=i;})();
 
 let palettePresets = {
@@ -571,8 +572,7 @@ function zoomImage(imgData, scaleX = 8, scaleY = 8) {
     }
   }
 
-  let newImgData = new ImageData(imgData.width * scaleX, imgData.height * scaleY);
-  newImgData.data.set(newImgDataArray);
+  let newImgData = new ImageData(newImgDataArray, imgData.width * scaleX, imgData.height * scaleY);
   return newImgData;
 }
 
@@ -775,20 +775,6 @@ function quantizeData (imgData, palette) {
   }
   console.debug(`${totalIterations} iterations passed spanning ${totalTimePass} ms. ${totalTimePass / totalIterations} ms on average.`);
 
-  let newImgData2;
-  switch (document.getElementById("dithering-algorithm").value) {
-    case "Floyd–Steinberg (failed attempt, floating-point arithmetics)":
-      newImgData2 = new ImageData(imgData.width, imgData.height);
-      newImgData2.data.set(newImgDataArray2);
-      return newImgData2;
-      break;
-    case "Floyd–Steinberg (failed attempt, bitwise operations)":
-      newImgData2 = new ImageData(imgData.width, imgData.height);
-      newImgData2.data.set(newImgDataArray2);
-      return newImgData2;
-      break;
-  }
-
  // Verify Conifer header
   if (document.getElementById("palette-presets").value == "Conifer") {
     if (encodedString.slice(0, 4) != "087f") {
@@ -804,6 +790,18 @@ function quantizeData (imgData, palette) {
     newEncodedString = newEncodedString.slice(document.getElementById("encoded-slice-start").value);
   }
   encodedString += newEncodedString;
+
+  let newImgData2;
+  switch (document.getElementById("dithering-algorithm").value) {
+    case "Floyd–Steinberg (failed attempt, floating-point arithmetics)":
+      newImgData2 = new ImageData(new Uint8ClampedArray(newImgDataArray2), imgData.width, imgData.height);
+      return newImgData2;
+      break;
+    case "Floyd–Steinberg (failed attempt, bitwise operations)":
+      newImgData2 = new ImageData(new Uint8ClampedArray(newImgDataArray2), imgData.width, imgData.height);
+      return newImgData2;
+      break;
+  }
 
   let newImgData = new ImageData(imgData.width, imgData.height);
   newImgData.data.set(newImgDataArray);
@@ -867,7 +865,7 @@ document.getElementById("palette-presets").addEventListener("input", (ev) => {
   document.getElementById("palette-text").appendChild(document.createTextNode(value));
   document.getElementById("import-palette").click();
 
-  if (ev.target.value == "Conifer") {
+  if (ev.target.value == "Conifer" || ev.target.value == "Black and white only") {
     document.getElementById("binary-slice-option-container").style.display = "block";
     document.getElementById("download-binary-container").style.display = "block";
   }
@@ -955,22 +953,29 @@ document.getElementById("copyToClipboard").addEventListener("click", () => {
 });
 
 document.getElementById("download-binary").addEventListener("click", () => {
+  let arr;
+
   if (document.getElementById("palette").children.length < 18) {
-    let arr = new Uint8Array(encodedString.length >> 1);
+    arr = new Uint8Array(encodedString.length >> 1);
     encodedString.match(/.{1,2}/g).forEach((e, i) => {
       arr[i] = parseInt(e, 16);
     });
-
-    if (document.getElementById("binary-slice-end").value) {
-      arr = arr.subarray(document.getElementById("binary-slice-start").value, document.getElementById("binary-slice-end").value);
-    } else {
-      arr = arr.subarray(document.getElementById("binary-slice-start").value);
-    }
-
-    saveFile(new Blob([arr]), document.getElementById("download-binary-filename").value);
+  } else if (document.getElementById("palette").children.length < 4) {
+    let arr = new Uint8Array(encodedString.length >> 3);
+    encodedString.match(/.{1,8}/g).forEach((e, i) => {
+      arr[i] = parseInt(e, 2);
+    });
   } else {
     return;
   }
+
+  if (document.getElementById("binary-slice-end").value) {
+    arr = arr.subarray(document.getElementById("binary-slice-start").value, document.getElementById("binary-slice-end").value);
+  } else {
+    arr = arr.subarray(document.getElementById("binary-slice-start").value);
+  }
+
+  saveFile(new Blob([arr]), document.getElementById("download-binary-filename").value);
 });
 
 let saveFile = (blob, filename = "") => {
