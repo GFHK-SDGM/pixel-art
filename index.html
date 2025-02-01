@@ -146,7 +146,14 @@ input[type=color] {
   <div id="photoContainer"></div>
   <div>
     <button id="save-btn">Save Image</button>
+    <div class="popup">
+      <button id="copyImageToClipboard">Copy Image to Clipboard</button>
+      <span class="popuptext" id="copy-image-popup">Image copied!</span>
+    </div>
     <button id="share-btn">Share Image</button>
+  </div>
+  <div>
+    <button id="pasteImageFromClipboard">Paste Image from Clipboard</button>
   </div>
   <div>
     <label for="isQuantized">Quantize the image</label>
@@ -206,12 +213,12 @@ input[type=color] {
       <button id="export-palette">Export palette</button>
     </div>
     <div class="popup">
-      <button id="copyPaletteToClipboard">Copy to Clipboard</button>
-      <span class="popuptext" id="copy-popup">String copied!</span>
+      <button id="copyPaletteToClipboard">Copy Palette to Clipboard</button>
+      <span class="popuptext" id="copy-palette-popup">Palette copied!</span>
     </div>
     <div class="popup">
-      <button id="copyPaletteToClipboard2">Copy to Clipboard (format 2)</button>
-      <span class="popuptext" id="copy-popup">String copied!</span>
+      <button id="copyPaletteToClipboard2">Copy Palette to Clipboard (Format 2)</button>
+      <span class="popuptext" id="copy-palette2-popup">Palette copied!</span>
     </div>
   </div>
   <div>
@@ -233,8 +240,8 @@ input[type=color] {
     <label for="encoded">Encoded string:</label>
     <div id="encoded" style="font-family: monospace; font-size: 1rem; max-width: 70vw; max-height: 5rem; overflow-x: hidden; overflow-wrap: anywhere; border: 2px solid #ccc; border-radius: 10px; padding: 0.25rem;"></div>
     <div class="popup">
-      <button id="copyToClipboard">Copy to Clipboard</button>
-      <span class="popuptext" id="copy-popup">String copied!</span>
+      <button id="copyStringToClipboard">Copy Encoded String to Clipboard</button>
+      <span class="popuptext" id="copy-string-popup">String copied!</span>
     </div>
   </div>
   <div id="binary-slice-option-container" style="display: none;">
@@ -263,6 +270,18 @@ HTMLImageElement.prototype.ready = async function () {
     this.onerror = (err) => {
       reject(err);
     };
+  });
+};
+
+HTMLCanvasElement.prototype.getBlob = async function () {
+  return new Promise((resolve, reject) => {
+    this.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+      } else {
+        reject(new Error(`Fail to get blob from canvas: ${this}.`));
+      };
+    }, "image/png");
   });
 };
 
@@ -572,8 +591,7 @@ function zoomImage(imgData, scaleX = 8, scaleY = 8) {
     }
   }
 
-  let newImgData = new ImageData(newImgDataArray, imgData.width * scaleX, imgData.height * scaleY);
-  return newImgData;
+  return new ImageData(newImgDataArray, imgData.width * scaleX, imgData.height * scaleY);
 }
 
 function quantizeData (imgData, palette) {
@@ -777,9 +795,9 @@ function quantizeData (imgData, palette) {
 
  // Verify Conifer header
   if (document.getElementById("palette-presets").value == "Conifer") {
-    if (encodedString.slice(0, 4) != "087f") {
-      console.warn(`Warning: Invalid Conifer header: ${encodedString.slice(0, 4)}`);
-      displayErrorMessage(`Invalid Conifer header: ${encodedString.slice(0, 4)}`);
+    if (newEncodedString.slice(0, 4) != "087f") {
+      console.warn(`Warning: Invalid Conifer header: ${newEncodedString.slice(0, 4)}`);
+      displayErrorMessage(`Invalid Conifer header: ${newEncodedString.slice(0, 4)}`);
     }
   }
 
@@ -820,9 +838,9 @@ document.getElementById("option-preset").addEventListener("input", (ev) => {
       document.getElementById("palette-presets").dispatchEvent(new Event("input", { bubbles: true, cancelable: true })); // Force to load the palette preset
 
       document.getElementById("encoded-slice-start").value = 4;
-      document.getElementById("encoded-slice-end").value = 7802;
+      document.getElementById("encoded-slice-end").value = 7964;
       // document.getElementById("binary-slice-start").value = 2;
-      // document.getElementById("binary-slice-end").value = 3901;
+      // document.getElementById("binary-slice-end").value = 3982;
       break;
     default:
       document.getElementById("preserveAspectRatio").checked = true;
@@ -928,27 +946,55 @@ function encodeString(image, el = document.getElementById("encoded")) {
   el.textContent = text;
 }
 
+document.getElementById("pasteImageFromClipboard").addEventListener("click", async () => {
+  const clipboardContents = await navigator.clipboard.read();
+  for (const item of clipboardContents) {
+    if (!item.types.includes("image/png")) {
+      throw new Error("Clipboard does not contain PNG image data.");
+    };
+    await renderImage(await item.getType("image/png"));
+  }
+});
+
+document.getElementById("copyImageToClipboard").addEventListener("click", async () => {
+  const img = document.querySelector("#photoContainer > img");
+  if (!img) {
+    displayErrorMessage("No image to copy.");
+    return;
+  }
+  const cnv = document.createElement("canvas");
+  cnv.width = img.width;
+  cnv.height = img.height;
+  cnv.getContext("2d").drawImage(img, 0, 0);
+  let blob = await cnv.getBlob();
+  navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+  document.getElementById("copy-image-popup").classList.toggle("show");
+  setTimeout(() => {
+    document.getElementById("copy-image-popup").classList.toggle("show");
+  }, 5000);
+});
+
 document.getElementById("copyPaletteToClipboard").addEventListener("click", () => {
   navigator.clipboard.writeText(document.getElementById("palette-text").textContent);
-  document.getElementById("copy-popup").classList.toggle("show");
+  document.getElementById("copy-palette-popup").classList.toggle("show");
   setTimeout(() => {
-    document.getElementById("copy-popup").classList.toggle("show");
+    document.getElementById("copy-palette-popup").classList.toggle("show");
   }, 5000);
 });
 
 document.getElementById("copyPaletteToClipboard2").addEventListener("click", () => {
   navigator.clipboard.writeText(document.getElementById("palette-text").textContent.match(/.{6}/g).join(","));
-  document.getElementById("copy-popup").classList.toggle("show");
+  document.getElementById("copy-palette2-popup").classList.toggle("show");
   setTimeout(() => {
-    document.getElementById("copy-popup").classList.toggle("show");
+    document.getElementById("copy-palette2-popup").classList.toggle("show");
   }, 5000);
 });
 
-document.getElementById("copyToClipboard").addEventListener("click", () => {
+document.getElementById("copyStringToClipboard").addEventListener("click", () => {
   navigator.clipboard.writeText(document.getElementById("encoded").textContent);
-  document.getElementById("copy-popup").classList.toggle("show");
+  document.getElementById("copy-string-popup").classList.toggle("show");
   setTimeout(() => {
-    document.getElementById("copy-popup").classList.toggle("show");
+    document.getElementById("copy-string-popup").classList.toggle("show");
   }, 5000);
 });
 
@@ -1006,12 +1052,13 @@ document.getElementById("share-btn").addEventListener("click", async () => {
     return;
   }
   const cnv = document.createElement("canvas");
-  cnv.width = img.width;
-  cnv.height = img.height;
+  cnv.width = img.width << 3;
+  cnv.height = img.height << 3;
   // cnv.getContext("2d").drawImage(img, 0, 0);
-  cnv.getContext("2d").putImageData(zoomImage(img), 0, 0);
-  let blob;
-  await cnv.toBlob((b) => {blob = b;}, "image/png");
+  const ctx = cnv.getContext("2d")
+  ctx.putImageData(zoomImage(ctx.getImageData(0, 0, img.width, img.height)), 0, 0);
+  document.body.appendChild(cnv);
+  let blob = await cnv.getBlob();
 
   try {
     await navigator.share({
