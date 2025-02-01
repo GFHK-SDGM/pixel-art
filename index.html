@@ -858,8 +858,8 @@ document.getElementById("option-preset").addEventListener("input", (ev) => {
 });
 
 document.getElementById("refresh").addEventListener("click", async () => {
-  if (typeof lastUsedBlob != "undefined") {
-    await renderImage(lastUsedBlob);
+  if (typeof self.lastUsedBlob != "undefined") {
+    await renderImage(self.lastUsedBlob);
   }
 });
 
