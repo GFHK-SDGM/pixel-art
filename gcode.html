@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+* {
+  font-family: sans-serif;
+}
+
+@media (prefers-color-scheme: light) {
+  body {
+    background: white;
+    color: black;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #17141d;
+    color: #c5c5c5;
+  }
+}
+</style>
+</head>
+<body>
+<div style="position: absolute; left: 50vw;">
+  <canvas width="40" height="40"></canvas>
+</div>
+<div>
+<input type="text" id="palette" placeholder="Colour palette" />
+</div>
+<div>
+<input type="text" id="matrix" placeholder="Colour matrix" />
+<button id="compile">Compile instructions</button>
+</div>
+<div>
+	<input type="file" />
+	<button id="sendFile">Send file</button>
+</div>
+<div>
+	<button id="connect">Connect</button>
+	<button id="disconnect" hidden>Disconnect</button>
+</div>
+<div>
+	<input type="text" id="manual-code" placeholder="Send G-codes manually ..." />
+	<button id="submit">Submit</button>
+</div>
+<script>
+"use strict";
+let inputEl = document.querySelector("input[type=file]");
+inputEl.addEventListener("input", async (ev) => {
+  self.file = ev.target.files[0];
+});
+let port;
+const textEncoder = new TextEncoderStream();
+
+// Get serial port
+document.getElementById("connect").addEventListener("click", async () => {
+  port = await navigator.serial.requestPort();
+  document.getElementById("connect").disabled = true;
+  document.getElementById("disconnect").hidden = false;
+  console.info(port.getInfo());
+  await port.open({ baudRate: 115200 });
+  // let textStream = TextEmitter(port.writable);
+  // let writer = port.writable.getWriter();
+
+  /*
+  while (true) {
+    try {
+      for await (const line of textStream) {
+        console.info(line);
+      };
+    } catch (err) {
+      console.error(err);
+      textStream = TextEmitter.line(port.writable);// reset WritableStream
+    }
+  };
+  */
+});
+
+// Serial disconnection
+document.getElementById("disconnect").addEventListener("click", async () => {
+  document.getElementById("connect").disabled = false;
+  document.getElementById("disconnect").hidden = true;
+  await port.forget();
+});
+
+navigator.serial.addEventListener("disconnect", () => {
+  document.getElementById("connect").disabled = false;
+  document.getElementById("disconnect").hidden = true;
+});
+
+// Send a compiled G-code file to serial
+document.getElementById("sendFile").addEventListener("click", async () => {
+  await writer.write(await file.arrayBuffer());
+});
+
+// Send a single line of instruction to serial manually
+document.getElementById("submit").addEventListener("click", async () => {
+  const textBox = document.getElementById("manual-code");
+  const writableStreamClosed = textEncoder.readable.pipeTo(port.writable);
+  const writer = textEncoder.writable.getWriter();
+  await writer.write(textBox.value);
+  console.info(textBox.value);
+});
+</script>
+</body>
+</html>
