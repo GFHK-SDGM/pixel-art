@@ -63,7 +63,7 @@ document.getElementById("connect").addEventListener("click", async () => {
   console.info(port.getInfo());
   await port.open({ baudRate: 115200 });
   // let textStream = TextEmitter(port.writable);
-  // let writer = port.writable.getWriter();
+  let writer = port.writable.getWriter();
 
   /*
   while (true) {
@@ -93,7 +93,13 @@ navigator.serial.addEventListener("disconnect", () => {
 
 // Send a compiled G-code file to serial
 document.getElementById("sendFile").addEventListener("click", async () => {
-  await writer.write(await file.arrayBuffer());
+  try {
+    await writer.ready();
+    await writer.write(await file.arrayBuffer());
+  } catch (err) {
+    console.error(err);
+    writer = port.writable.getWriter(); // reset WritableStream
+  };
 });
 
 // Send a single line of instruction to serial manually
