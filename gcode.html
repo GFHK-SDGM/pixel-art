@@ -21,30 +21,49 @@
     color: #c5c5c5;
   }
 }
+
+input, button {
+  font-size: 1rem;
+}
+
+#img-preview {
+  transform: scale(8);
+  image-rendering: pixelated;
+  border: 1px solid black;
+}
 </style>
 </head>
 <body>
-<div style="position: absolute; left: 50vw;">
-  <canvas width="40" height="40"></canvas>
+<div style="position: absolute; left: 50vw; top: 160px;">
+  <canvas id="img-preview" width="40" height="40"></canvas>
 </div>
 <div>
-<input type="text" id="palette" placeholder="Colour palette" />
+  <input type="text" id="palette" placeholder="Colour palette" />
 </div>
 <div>
-<input type="text" id="matrix" placeholder="Colour matrix" />
-<button id="compile">Compile instructions</button>
+  <input type="text" id="matrix" placeholder="Colour matrix" />
+  <button id="compile">Compile instructions</button>
+  <button id="download-btn">Download</button>
+  <label for="toggle-display">Display compiled instructions</label>
+  <input type="checkbox" id="toggle-display" />
+</div>
+<div id="compiled-instructions" style="display: none;"></div>
+<div>
+  <input type="file" />
+  <button id="sendFile">Send file</button>
 </div>
 <div>
-	<input type="file" />
-	<button id="sendFile">Send file</button>
+  <label for="baud-rate">Serial baud rate:</label>
+  <input type="number" id="baud-rate" value="9600" placeholder="Baud rate" />
+  <button id="connect">Connect</button>
+  <button id="disconnect" hidden>Disconnect</button>
 </div>
 <div>
-	<button id="connect">Connect</button>
-	<button id="disconnect" hidden>Disconnect</button>
+  <input type="text" id="manual-code" placeholder="Send G-codes manually ..." />
+  <button id="submit">Submit</button>
 </div>
 <div>
-	<input type="text" id="manual-code" placeholder="Send G-codes manually ..." />
-	<button id="submit">Submit</button>
+  <a href="index.html">Return to Homepage</a>
 </div>
 <script>
 "use strict";
@@ -52,6 +71,7 @@ let inputEl = document.querySelector("input[type=file]");
 inputEl.addEventListener("input", async (ev) => {
   self.file = ev.target.files[0];
 });
+
 let port;
 const textEncoder = new TextEncoderStream();
 
@@ -61,7 +81,7 @@ document.getElementById("connect").addEventListener("click", async () => {
   document.getElementById("connect").disabled = true;
   document.getElementById("disconnect").hidden = false;
   console.info(port.getInfo());
-  await port.open({ baudRate: 115200 });
+  await port.open({ baudRate: document.getElementById("baud-rate").value });
   // let textStream = TextEmitter(port.writable);
   let writer = port.writable.getWriter();
 
@@ -96,6 +116,7 @@ document.getElementById("sendFile").addEventListener("click", async () => {
   try {
     await writer.ready();
     await writer.write(await file.arrayBuffer());
+    writer.releaseLock();
   } catch (err) {
     console.error(err);
     writer = port.writable.getWriter(); // reset WritableStream
@@ -109,6 +130,32 @@ document.getElementById("submit").addEventListener("click", async () => {
   const writer = textEncoder.writable.getWriter();
   await writer.write(textBox.value);
   console.info(textBox.value);
+
+  writer.releaseLock();
+});
+
+document.getElementById("toggle-display").addEventListener("click", () => {
+  let el = document.getElementById("compiled-instructions");
+
+  if (el.style.display = "none") {
+    el.style.display = "block";
+  } else {
+    el.style.display = "none";
+  };
+});
+
+let saveFile = (blob, filename = "") => {
+  const a = document.createElement("a");
+  a.download = filename;
+  a.href = URL.createObjectURL(blob);
+  a.addEventListener("click", () => {
+    setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+  });
+  a.click();
+};
+
+document.getElementById("download-btn").addEventListener("click", () => {
+  saveFile(new Blob([document.getElementById("compiled-instructions").textContent], { type: "text/plain" }));
 });
 </script>
 </body>
