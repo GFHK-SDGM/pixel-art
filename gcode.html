@@ -30,6 +30,12 @@ input, button {
   transform: scale(8);
   image-rendering: pixelated;
 }
+
+.color-box {
+  border: 1px solid darkgrey;
+  text-align: center;
+  font-size: 1.5rem;
+}
 </style>
 </head>
 <body>
@@ -61,6 +67,10 @@ input, button {
 <div>
   <input type="text" id="manual-code" placeholder="Send G-codes manually ..." />
   <button id="submit">Submit</button>
+</div>
+<div>
+  <span id="palette-display-notice" hidden>Place your materials in the following order:</span>
+  <div id="palette-display"></div>
 </div>
 <div>
   <a href="index.html">Return to Homepage</a>
@@ -127,6 +137,24 @@ document.getElementById("toggle-display").addEventListener("click", () => {
     el.style.display = "block";
   } else {
     el.style.display = "none";
+  };
+});
+
+document.getElementById("palette").addEventListener("input", (ev) => {
+  document.getElementById("palette-display").innerHTML = "";
+
+  if (ev.target.value) {
+    let palette = document.getElementById("palette").value.match(/.{6}/g).map(e => "#" + e);
+    palette.forEach((e) => {
+      let colorBox = document.createElement("span");
+      colorBox.appendChild(document.createTextNode("　"));
+      colorBox.style.backgroundColor = e;
+      colorBox.classList.add("color-box");
+      document.getElementById("palette-display").appendChild(colorBox);
+    });
+    document.getElementById("palette-display-notice").hidden = false;
+  } else {
+    document.getElementById("palette-display-notice").hidden = true;
   };
 });
 
