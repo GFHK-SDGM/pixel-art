@@ -110,11 +110,10 @@ navigator.serial.addEventListener("disconnect", () => {
 
 // Send a compiled G-code file to serial
 document.getElementById("sendFile").addEventListener("click", async () => {
-  let writer = port.writable.getWriter();
   try {
-    await writer.ready();
+    // await writer.ready();
     await writer.write(await file.arrayBuffer());
-    writer.releaseLock();
+    // writer.releaseLock();
   } catch (err) {
     console.error(err);
     writer = port.writable.getWriter(); // reset WritableStream
@@ -124,15 +123,26 @@ document.getElementById("sendFile").addEventListener("click", async () => {
 // Send a single line of instruction to serial manually
 document.getElementById("submit").addEventListener("click", async () => {
   const textBox = document.getElementById("manual-code");
+  /*
   writer.releaseLock();
   const writableStreamClosed = textEncoderStream.readable.pipeTo(writableStream);
   const textWriter = textEncoderStream.writable.getWriter();
-  await textWriter.ready();
+  // await textWriter.ready();
   await textWriter.write(textBox.value);
+  */
+  const textArr = new TextEncoder().encode(textBox.value);
+  try {
+    // await writer.ready();
+    await writer.write(textArr);
+    // writer.releaseLock();
+  } catch (err) {
+    console.error(err);
+    writer = port.writable.getWriter(); // reset WritableStream
+  };
   console.info(textBox.value);
 
-  textWriter.releaseLock();
-  writer.releaseLock();
+  // textWriter.releaseLock();  
+  // writer.releaseLock();
 });
 
 document.getElementById("toggle-display").addEventListener("click", () => {
