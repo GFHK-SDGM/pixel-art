@@ -60,7 +60,7 @@ input, button {
 </div>
 <div>
   <label for="baud-rate">Serial baud rate:</label>
-  <input type="number" id="baud-rate" value="9600" placeholder="Baud rate" />
+  <input type="number" id="baud-rate" value="115200" placeholder="Baud rate" />
   <button id="connect">Connect</button>
   <button id="disconnect" hidden>Disconnect</button>
 </div>
@@ -82,8 +82,8 @@ inputEl.addEventListener("input", async (ev) => {
   self.file = ev.target.files[0];
 });
 
-let port;
-const textEncoder = new TextEncoderStream();
+let port, writableStream, writer;
+const textEncoderStream = new TextEncoderStream();
 
 // Get serial port
 document.getElementById("connect").addEventListener("click", async () => {
@@ -92,6 +92,8 @@ document.getElementById("connect").addEventListener("click", async () => {
   document.getElementById("disconnect").hidden = false;
   console.info(port.getInfo());
   await port.open({ baudRate: document.getElementById("baud-rate").value });
+  writableStream = port.writable;
+  writer = writableStream.getWriter();
 });
 
 // Serial disconnection
@@ -122,12 +124,15 @@ document.getElementById("sendFile").addEventListener("click", async () => {
 // Send a single line of instruction to serial manually
 document.getElementById("submit").addEventListener("click", async () => {
   const textBox = document.getElementById("manual-code");
-  const writableStreamClosed = textEncoder.readable.pipeTo(port.writable);
-  const writer = textEncoder.writable.getWriter();
-  await writer.write(textBox.value);
+  writer.releaseLock();
+  const writableStreamClosed = textEncoderStream.readable.pipeTo(writableStream);
+  const textWriter = textEncoderStream.writable.getWriter();
+  await textWriter.ready();
+  await textWriter.write(textBox.value);
   console.info(textBox.value);
 
-  port.writable.getWriter().releaseLock();
+  textWriter.releaseLock();
+  writer.releaseLock();
 });
 
 document.getElementById("toggle-display").addEventListener("click", () => {
