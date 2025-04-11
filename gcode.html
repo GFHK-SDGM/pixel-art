@@ -29,16 +29,16 @@ input, button {
 #img-preview {
   transform: scale(8);
   image-rendering: pixelated;
-  border: 1px solid black;
 }
 </style>
 </head>
 <body>
-<div style="position: absolute; left: 50vw; top: 160px;">
+<div style="position: absolute; left: 75vw; top: 160px; border: 1px solid black;">
   <canvas id="img-preview" width="40" height="40"></canvas>
 </div>
 <div>
   <input type="text" id="palette" placeholder="Colour palette" />
+  <button id="preview-btn">Preview</button>
 </div>
 <div>
   <input type="text" id="matrix" placeholder="Colour matrix" />
@@ -82,21 +82,6 @@ document.getElementById("connect").addEventListener("click", async () => {
   document.getElementById("disconnect").hidden = false;
   console.info(port.getInfo());
   await port.open({ baudRate: document.getElementById("baud-rate").value });
-  // let textStream = TextEmitter(port.writable);
-  let writer = port.writable.getWriter();
-
-  /*
-  while (true) {
-    try {
-      for await (const line of textStream) {
-        console.info(line);
-      };
-    } catch (err) {
-      console.error(err);
-      textStream = TextEmitter.line(port.writable);// reset WritableStream
-    }
-  };
-  */
 });
 
 // Serial disconnection
@@ -113,6 +98,7 @@ navigator.serial.addEventListener("disconnect", () => {
 
 // Send a compiled G-code file to serial
 document.getElementById("sendFile").addEventListener("click", async () => {
+  let writer = port.writable.getWriter();
   try {
     await writer.ready();
     await writer.write(await file.arrayBuffer());
@@ -131,7 +117,7 @@ document.getElementById("submit").addEventListener("click", async () => {
   await writer.write(textBox.value);
   console.info(textBox.value);
 
-  writer.releaseLock();
+  port.writable.getWriter().releaseLock();
 });
 
 document.getElementById("toggle-display").addEventListener("click", () => {
@@ -142,6 +128,35 @@ document.getElementById("toggle-display").addEventListener("click", () => {
   } else {
     el.style.display = "none";
   };
+});
+
+document.getElementById("preview-btn").addEventListener("click", () => {
+  let ctx = document.querySelector("canvas").getContext("2d");
+  let palette = document.getElementById("palette").value.match(/.{6}/g); // map(e => "#" + e)
+  let rawMatrix = document.getElementById("matrix").value;
+  let width = parseInt(rawMatrix.slice(0, 2), 16);
+  let height = parseInt(rawMatrix.slice(2, 4), 16);
+  if (width > 40)
+    width = 40;
+  if (height > 40)
+    height = 40;
+  let matrix = rawMatrix.slice(4);
+
+  let imgDataArray = new Uint8ClampedArray(width * height << 2);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let pixelIndex = y * width + x;
+      let largePixelIndex = pixelIndex << 2;
+      // console.info(`i = ${pixelIndex}, colorNum = ${matrix[pixelIndex]}, color = ${palette[parseInt(matrix[pixelIndex], 16)]}`);
+      let colors = palette[parseInt(matrix[pixelIndex], 16)].match(/.{2}/g).map(e => parseInt(e, 16));
+      imgDataArray[largePixelIndex] = colors[0];
+      imgDataArray[largePixelIndex + 1] = colors[1];
+      imgDataArray[largePixelIndex + 2] = colors[2];
+      imgDataArray[largePixelIndex + 3] = 255;
+    }
+  }
+  let imgData = new ImageData(imgDataArray, width, height);
+  ctx.putImageData(imgData, 0, 0);
 });
 
 let saveFile = (blob, filename = "") => {
