@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-* {
+body {
   font-family: sans-serif;
 }
 
@@ -22,8 +22,12 @@
   }
 }
 
-input, button {
+input, button, pre {
   font-size: 1rem;
+}
+
+pre {
+  margin: 0;
 }
 
 #img-preview {
@@ -49,11 +53,12 @@ input, button {
 <div>
   <input type="text" id="matrix" placeholder="Colour matrix" />
   <button id="compile">Compile instructions</button>
-  <button id="download-btn">Download</button>
+  <button id="download-btn">Download as a file</button>
+  <button id="send-compiled">Send compiled instructions</button>
   <label for="toggle-display">Display compiled instructions</label>
   <input type="checkbox" id="toggle-display" />
 </div>
-<div id="compiled-instructions" style="display: none;"></div>
+<pre id="compiled-instructions" style="display: none;"></pre>
 <div>
   <input type="file" />
   <button id="sendFile">Send file</button>
@@ -77,6 +82,9 @@ input, button {
 </div>
 <script>
 "use strict";
+// Code referenced from ltgcgo/rochelle, licensed under GNU LGPL 3.0
+(()=>{var L=Object.defineProperty;var R=(a,t,s)=>t in a?L(a,t,{enumerable:!0,configurable:!0,writable:!0,value:s}):a[t]=s;var m=(a,t,s)=>(R(a,typeof t!="symbol"?t+"":t,s),s);var o=["utf-8","utf-16","utf-16be"],b=(a,t)=>{a.unsent=!1,a.enqueue(t)},w,S=(w=class{static lineRaw(a,t=0){if(t?.constructor!=Number||t<0||t>=o.length)throw new TypeError("Invalid split mode");if(t)throw new Error("UTF-16LE/BE currently not implemented");if(!a||a?.constructor!=ReadableStream)throw new TypeError("Not a readable stream");let s=a.getReader(),n,c=!1,e=[],r=0,l=0,y=0;return new ReadableStream({pull:async h=>{for(h.unsent=!0;h.unsent;){if(!n||r>=n.length){r>l&&(e.push(n.subarray(l)),l=0);let{value:g,done:u}=await s.read();n=g,c=u,r=0}if(n){let g=n[r],u=!1;switch(g){case 10:{y==13?l++:u=!0;break}case 13:{u=!0;break}}if(u){if(e.length){e.push(n.subarray(l,r));let d=0;for(let f=0;f<e.length;f++)d+=e[f].length;let i=new Uint8Array(d),T=0;for(let f=0;f<e.length;f++)i.set(e[f],T),T+=e[f].length;b(h,i),e=[]}else b(h,n.subarray(l,r));l=r+1}y=g}if(c){if(l!=r&&e.push(n.subarray(l,r)),e.length){let g=0;for(let i=0;i<e.length;i++)g+=e[i].length;let u=new Uint8Array(g),d=0;for(let i=0;i<e.length;i++)u.set(e[i],d),d+=e[i].length;b(h,u)}h.unsent=!1,h.close()}r++}}},new ByteLengthQueuingStrategy({highWaterMark:256}))}static line(a,t=0,s){let n=this.lineRaw(a,t).getReader(),c=new TextDecoder(s||o[t]);return new ReadableStream({pull:async e=>{let{value:r,done:l}=await n.read();r&&e.enqueue(c.decode(r)),l&&e.close()}})}},m(w,"SPLIT_UTF_8",0),m(w,"SPLIT_UTF_16_LE",1),m(w,"SPLIT_UTF_16_BE",2),w),E=S;self.TextReader=E;})();
+
 let inputEl = document.querySelector("input[type=file]");
 inputEl.addEventListener("input", async (ev) => {
   self.file = ev.target.files[0];
@@ -94,6 +102,14 @@ document.getElementById("connect").addEventListener("click", async () => {
   await port.open({ baudRate: document.getElementById("baud-rate").value });
   writableStream = port.writable;
   writer = writableStream.getWriter();
+
+  // Print serial outputs from the printer on the console
+  let textStream = TextReader.line(port.readable);
+  for await (const line of textStream) {
+    if (line) {
+      console.debug(line);
+    };
+  };
 });
 
 // Serial disconnection
@@ -120,6 +136,15 @@ document.getElementById("sendFile").addEventListener("click", async () => {
   };
 });
 
+document.getElementById("send-compiled").addEventListener("click", async () => {
+  try {
+    await writer.write(await new Blob([document.getElementById("compiled-instructions").textContent]).arrayBuffer());
+  } catch (err) {
+    console.error(err);
+    writer = port.writable.getWriter(); // reset WritableStream
+  };
+});
+
 // Send a single line of instruction to serial manually
 document.getElementById("submit").addEventListener("click", async () => {
   const textBox = document.getElementById("manual-code");
@@ -130,7 +155,7 @@ document.getElementById("submit").addEventListener("click", async () => {
   // await textWriter.ready();
   await textWriter.write(textBox.value);
   */
-  const textArr = new TextEncoder().encode(textBox.value);
+  const textArr = new TextEncoder().encode(`${textBox.value}\n`);
   try {
     // await writer.ready();
     await writer.write(textArr);
@@ -148,7 +173,7 @@ document.getElementById("submit").addEventListener("click", async () => {
 document.getElementById("toggle-display").addEventListener("click", () => {
   let el = document.getElementById("compiled-instructions");
 
-  if (el.style.display = "none") {
+  if (el.style.display == "none") {
     el.style.display = "block";
   } else {
     el.style.display = "none";
@@ -200,6 +225,30 @@ document.getElementById("preview-btn").addEventListener("click", () => {
   }
   let imgData = new ImageData(imgDataArray, width, height);
   ctx.putImageData(imgData, 0, 0);
+});
+
+document.getElementById("compile").addEventListener("click", () => {
+  let output = "G28\nG1 X155 Y105 Z5\n";
+  let rawMatrix = document.getElementById("matrix").value;
+  let width = parseInt(rawMatrix.slice(0, 2), 16);
+  let height = parseInt(rawMatrix.slice(2, 4), 16);
+  if (width > 40)
+    width = 40;
+  if (height > 40)
+    height = 40;
+  let matrix = rawMatrix.slice(4);
+
+  for (let index in matrix) {
+    let xCoord = index % height;
+    let yCoord = (index - xCoord) / height;
+    // console.info(`(${xCoord}, ${yCoord})`);
+    let materialYCoord = parseInt(matrix[index], 36) * 10 + 50;
+    let targetXCoord = 100 + 5 * xCoord;
+    let targetYCoord = 50 + 5 * yCoord;
+    output += `G1 X280 Y${materialYCoord}\nG1 X${targetXCoord} Y${targetYCoord}\n`;
+  }
+
+  document.getElementById("compiled-instructions").textContent = output;
 });
 
 let saveFile = (blob, filename = "") => {
