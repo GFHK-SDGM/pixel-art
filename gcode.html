@@ -85,6 +85,12 @@ pre {
 // Code referenced from ltgcgo/rochelle, licensed under GNU LGPL 3.0
 (()=>{var L=Object.defineProperty;var R=(a,t,s)=>t in a?L(a,t,{enumerable:!0,configurable:!0,writable:!0,value:s}):a[t]=s;var m=(a,t,s)=>(R(a,typeof t!="symbol"?t+"":t,s),s);var o=["utf-8","utf-16","utf-16be"],b=(a,t)=>{a.unsent=!1,a.enqueue(t)},w,S=(w=class{static lineRaw(a,t=0){if(t?.constructor!=Number||t<0||t>=o.length)throw new TypeError("Invalid split mode");if(t)throw new Error("UTF-16LE/BE currently not implemented");if(!a||a?.constructor!=ReadableStream)throw new TypeError("Not a readable stream");let s=a.getReader(),n,c=!1,e=[],r=0,l=0,y=0;return new ReadableStream({pull:async h=>{for(h.unsent=!0;h.unsent;){if(!n||r>=n.length){r>l&&(e.push(n.subarray(l)),l=0);let{value:g,done:u}=await s.read();n=g,c=u,r=0}if(n){let g=n[r],u=!1;switch(g){case 10:{y==13?l++:u=!0;break}case 13:{u=!0;break}}if(u){if(e.length){e.push(n.subarray(l,r));let d=0;for(let f=0;f<e.length;f++)d+=e[f].length;let i=new Uint8Array(d),T=0;for(let f=0;f<e.length;f++)i.set(e[f],T),T+=e[f].length;b(h,i),e=[]}else b(h,n.subarray(l,r));l=r+1}y=g}if(c){if(l!=r&&e.push(n.subarray(l,r)),e.length){let g=0;for(let i=0;i<e.length;i++)g+=e[i].length;let u=new Uint8Array(g),d=0;for(let i=0;i<e.length;i++)u.set(e[i],d),d+=e[i].length;b(h,u)}h.unsent=!1,h.close()}r++}}},new ByteLengthQueuingStrategy({highWaterMark:256}))}static line(a,t=0,s){let n=this.lineRaw(a,t).getReader(),c=new TextDecoder(s||o[t]);return new ReadableStream({pull:async e=>{let{value:r,done:l}=await n.read();r&&e.enqueue(c.decode(r)),l&&e.close()}})}},m(w,"SPLIT_UTF_8",0),m(w,"SPLIT_UTF_16_LE",1),m(w,"SPLIT_UTF_16_BE",2),w),E=S;self.TextReader=E;})();
 
+let sleep = async function (ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+};
+
 let inputEl = document.querySelector("input[type=file]");
 inputEl.addEventListener("input", async (ev) => {
   self.file = ev.target.files[0];
@@ -126,10 +132,16 @@ navigator.serial.addEventListener("disconnect", () => {
 
 // Send a compiled G-code file to serial
 document.getElementById("sendFile").addEventListener("click", async () => {
+  // Split the input file into chunks of 8 lines
+  let stringArray = (await file.text()).match(/(.*(?:\n|$)){8}/g) || []; // Returns null if no match, so use || []
+  let blobs = stringArray.map(line => new Blob([line]));
+
   try {
-    // await writer.ready();
-    await writer.write(await file.arrayBuffer());
-    // writer.releaseLock();
+    for (let i = 0; i < blobs.length; i++) {
+      await writer.write(await blobs[i].arrayBuffer());
+      console.warn(`Sending chunk #${i}. Sleeping for 10 seconds.`);
+      await sleep(10000);
+    };
   } catch (err) {
     console.error(err);
     writer = port.writable.getWriter(); // reset WritableStream
@@ -137,8 +149,22 @@ document.getElementById("sendFile").addEventListener("click", async () => {
 });
 
 document.getElementById("send-compiled").addEventListener("click", async () => {
+  // Split the input file into chunks of 8 lines
+  let stringArray = document.getElementById("compiled-instructions").textContent.match(/(.*(?:\n|$)){8}/g) || []; // Returns null if no match, so use || []
+  let blobs = stringArray.map(line => new Blob([line]));
+
   try {
-    await writer.write(await new Blob([document.getElementById("compiled-instructions").textContent]).arrayBuffer());
+    /*
+    blobs.forEach(async blob => {
+      await writer.write(await blob.arrayBuffer());
+    });
+    */
+
+    for (let i = 0; i < blobs.length; i++) {
+      await writer.write(await blobs[i].arrayBuffer());
+      console.warn(`Sending chunk #${i}. Sleeping for 10 seconds.`);
+      await sleep(10000);
+    };
   } catch (err) {
     console.error(err);
     writer = port.writable.getWriter(); // reset WritableStream
