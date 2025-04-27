@@ -295,12 +295,12 @@ document.getElementById("palette").addEventListener("keydown", function (ev) {
 document.getElementById("compile").addEventListener("click", () => {
   let releasedHeight = document.getElementById("releasedHeight").value;
   let compressedHeight = document.getElementById("compressedHeight").value;
-  let pixelSize = document.getElementById("pixelSize").value;
-  let originX = document.getElementById("originX").value;
-  let originY = document.getElementById("originY").value;
-  let transparentColourIndex = document.getElementById("transparentColourIndex").value;
+  let pixelSize = parseInt(document.getElementById("pixelSize").value);
+  let originX = parseInt(document.getElementById("originX").value);
+  let originY = parseInt(document.getElementById("originY").value);
+  let transparentColourIndex = parseInt(document.getElementById("transparentColourIndex").value);
   let materialXCoord = document.getElementById("materialXCoord").value;
-  let materialYOrigin = document.getElementById("materialYOrigin").value;
+  let materialYOrigin = parseInt(document.getElementById("materialYOrigin").value);
 
   let output = `G28\nG1 X155 Y105 Z${releasedHeight}\n`; // Locate the centre point first
   let rawMatrix = document.getElementById("matrix").value;
@@ -320,7 +320,7 @@ document.getElementById("compile").addEventListener("click", () => {
       let materialYCoord = parseInt(matrix[index], 36) * (pixelSize << 1) + materialYOrigin;
       let targetXCoord = originX + pixelSize * yCoord; // reverse x and y coordinates for better manipulation
       let targetYCoord = originY + pixelSize * xCoord;
-      output += `G1 X{materialXCoord} Y${materialYCoord} Z${releasedHeight}\n`; // go take the material
+      output += `G1 X${materialXCoord} Y${materialYCoord} Z${releasedHeight}\n`; // go take the material
       output += `G1 Z${compressedHeight}\n`;
       output += `G1 X${targetXCoord} Y${targetYCoord} Z${compressedHeight}\n`; // drag
       output += `G1 Z${releasedHeight}\n`;
