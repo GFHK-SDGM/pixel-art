@@ -67,6 +67,24 @@ pre {
   <label for="compressedHeight">Compressed height:</label>
   <input type="number" id="compressedHeight" placeholder="Compressed height" value="3" />
 </div>
+<div>
+  <label for="pixelSize">Pixel size:</label>
+  <input type="number" id="pixelSize" placeholder="Pixel size" value="5" />
+  Origin:
+  <input type="number" id="originX" placeholder="X" value="100" />
+  <input type="number" id="originY" placeholder="Y" value="50" />
+</div>
+<div>
+  <label for="materialXCoord">Material X coord:</label>
+  <input type="number" id="materialXCoord" placeholder="Material X coord" value="280" />
+</div>
+<div>
+  <label for="materialYOrigin">Material Y origin:</label>
+  <input type="number" id="materialYOrigin" placeholder="Material Y origin" value="50" />
+</div>
+<div>
+  Treat colour # <input type="number" id="transparentColourIndex" /> as transparent
+</div>
 <pre id="compiled-instructions" style="display: none;"></pre>
 <div>
   <input type="file" />
@@ -277,7 +295,14 @@ document.getElementById("palette").addEventListener("keydown", function (ev) {
 document.getElementById("compile").addEventListener("click", () => {
   let releasedHeight = document.getElementById("releasedHeight").value;
   let compressedHeight = document.getElementById("compressedHeight").value;
-  let output = `G28\nG1 X155 Y105 Z${releasedHeight}\n`;// Locate the centre point first
+  let pixelSize = document.getElementById("pixelSize").value;
+  let originX = document.getElementById("originX").value;
+  let originY = document.getElementById("originY").value;
+  let transparentColourIndex = document.getElementById("transparentColourIndex").value;
+  let materialXCoord = document.getElementById("materialXCoord").value;
+  let materialYOrigin = document.getElementById("materialYOrigin").value;
+
+  let output = `G28\nG1 X155 Y105 Z${releasedHeight}\n`; // Locate the centre point first
   let rawMatrix = document.getElementById("matrix").value;
   let width = parseInt(rawMatrix.slice(0, 2), 16);
   let height = parseInt(rawMatrix.slice(2, 4), 16);
@@ -288,16 +313,18 @@ document.getElementById("compile").addEventListener("click", () => {
   let matrix = rawMatrix.slice(4);
 
   for (let index in matrix) {
-    let xCoord = index % height;
-    let yCoord = (index - xCoord) / height;
-    // console.info(`(${xCoord}, ${yCoord})`);
-    let materialYCoord = parseInt(matrix[index], 36) * 10 + 50;
-    let targetXCoord = 100 + 5 * xCoord;
-    let targetYCoord = 50 + 5 * yCoord;
-    output += `G1 X280 Y${materialYCoord} Z${releasedHeight}\n`; // go take the material
-	output += `G1 Z${compressedHeight}\n`;
-	output += `G1 X${targetXCoord} Y${targetYCoord} Z${compressedHeight}\n`; // drag
-	output += `G1 Z${releasedHeight}\n`;
+    if (parseInt(matrix[index], 36) != transparentColourIndex) {
+      let xCoord = index % height;
+      let yCoord = (index - xCoord) / height;
+      // console.info(`(${xCoord}, ${yCoord})`);
+      let materialYCoord = parseInt(matrix[index], 36) * (pixelSize << 1) + materialYOrigin;
+      let targetXCoord = originX + pixelSize * yCoord; // reverse x and y coordinates for better manipulation
+      let targetYCoord = originY + pixelSize * xCoord;
+      output += `G1 X{materialXCoord} Y${materialYCoord} Z${releasedHeight}\n`; // go take the material
+      output += `G1 Z${compressedHeight}\n`;
+      output += `G1 X${targetXCoord} Y${targetYCoord} Z${compressedHeight}\n`; // drag
+      output += `G1 Z${releasedHeight}\n`;
+    }
   }
 
   document.getElementById("compiled-instructions").textContent = output;
