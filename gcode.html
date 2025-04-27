@@ -50,7 +50,7 @@ pre {
   <canvas id="img-preview" width="40" height="40"></canvas>
 </div>
 <div>
-  <input type="text" id="palette" placeholder="Colour palette" />
+  <input type="text" id="palette" placeholder="Colour palette" value="000000ffffff" />
   <button id="preview-btn">Preview</button>
 </div>
 <div>
@@ -75,12 +75,16 @@ pre {
   <input type="number" id="originY" placeholder="Y" value="50" />
 </div>
 <div>
-  <label for="materialXCoord">Material X coord:</label>
-  <input type="number" id="materialXCoord" placeholder="Material X coord" value="280" />
+  <label for="materialXOrigin">Material X origin:</label>
+  <input type="number" id="materialXOrigin" placeholder="Material X origin" value="280" />
 </div>
 <div>
   <label for="materialYOrigin">Material Y origin:</label>
   <input type="number" id="materialYOrigin" placeholder="Material Y origin" value="50" />
+</div>
+<div>
+  <label for="maxMaterialChamberSize">Max material chamber size:</label>
+  <input type="number" id="maxMaterialChamberSize" placeholder="Max material chamber size" value="4" />
 </div>
 <div>
   Treat colour # <input type="number" id="transparentColourIndex" /> as transparent
@@ -166,8 +170,8 @@ document.getElementById("sendFile").addEventListener("click", async () => {
   try {
     for (let i = 0; i < blobs.length; i++) {
       await writer.write(await blobs[i].arrayBuffer());
-      console.warn(`Sending chunk #${i}. Sleeping for 10 seconds.`);
-      await sleep(10000);
+      console.warn(`Sending chunk #${i}. Sleeping for 15 seconds.`);
+      await sleep(15000);
     };
   } catch (err) {
     console.error(err);
@@ -189,8 +193,8 @@ document.getElementById("send-compiled").addEventListener("click", async () => {
 
     for (let i = 0; i < blobs.length; i++) {
       await writer.write(await blobs[i].arrayBuffer());
-      console.warn(`Sending chunk #${i}. Sleeping for 10 seconds.`);
-      await sleep(10000);
+      console.warn(`Sending chunk #${i}. Sleeping for 15 seconds.`);
+      await sleep(15000);
     };
   } catch (err) {
     console.error(err);
@@ -298,11 +302,13 @@ document.getElementById("compile").addEventListener("click", () => {
   let pixelSize = parseInt(document.getElementById("pixelSize").value);
   let originX = parseInt(document.getElementById("originX").value);
   let originY = parseInt(document.getElementById("originY").value);
-  let transparentColourIndex = parseInt(document.getElementById("transparentColourIndex").value);
-  let materialXCoord = document.getElementById("materialXCoord").value;
+  let materialXOrigin = parseInt(document.getElementById("materialXOrigin").value);
   let materialYOrigin = parseInt(document.getElementById("materialYOrigin").value);
+  let maxMaterialChamberSize = parseInt(document.getElementById("maxMaterialChamberSize").value);
+  let transparentColourIndex = parseInt(document.getElementById("transparentColourIndex").value);
 
-  let output = `G28\nG1 X155 Y105 Z${releasedHeight}\n`; // Locate the centre point first
+  let output = `G28\nG1 Z${releasedHeight}\n`;
+  // let output = `G28\nG1 X155 Y105 Z${releasedHeight}\n`; // Locate the centre point first
   let rawMatrix = document.getElementById("matrix").value;
   let width = parseInt(rawMatrix.slice(0, 2), 16);
   let height = parseInt(rawMatrix.slice(2, 4), 16);
@@ -312,21 +318,31 @@ document.getElementById("compile").addEventListener("click", () => {
     height = 40;
   let matrix = rawMatrix.slice(4);
 
+  let colourCounter = new Uint8Array(Math.floor(document.getElementById("palette").value.length / 6));
+
   for (let index in matrix) {
     if (parseInt(matrix[index], 36) != transparentColourIndex) {
       let xCoord = index % height;
       let yCoord = (index - xCoord) / height;
-      // console.info(`(${xCoord}, ${yCoord})`);
-      let materialYCoord = parseInt(matrix[index], 36) * (pixelSize << 1) + materialYOrigin;
+      let pixelColour = matrix[index];
+      // console.info(`(${xCoord}, ${yCoord}, ${colourCounter[pixelColour]})`);
+      let materialXCoord = materialXOrigin + colourCounter[pixelColour] * pixelSize;
+      let materialYCoord = parseInt(pixelColour, 36) * (pixelSize << 1) + materialYOrigin;
       let targetXCoord = originX + pixelSize * yCoord; // reverse x and y coordinates for better manipulation
       let targetYCoord = originY + pixelSize * xCoord;
-      output += `G1 X${materialXCoord} Y${materialYCoord} Z${releasedHeight}\n`; // go take the material
+      output += `G1 X${materialXCoord} Y${materialYCoord} Z${releasedHeight} ; ${xCoord}, ${yCoord}, ${colourCounter[pixelColour]}\n`; // go take the material
       output += `G1 Z${compressedHeight}\n`;
       output += `G1 X${targetXCoord} Y${targetYCoord} Z${compressedHeight}\n`; // drag
       output += `G1 Z${releasedHeight}\n`;
+
+      if (colourCounter[pixelColour] < maxMaterialChamberSize - 1)
+        colourCounter[pixelColour]++;
+      else
+        colourCounter[pixelColour] = 0;
     }
   }
 
+  output += "G1 Z50\n"; // Lower the platform when end
   document.getElementById("compiled-instructions").textContent = output;
 });
 
