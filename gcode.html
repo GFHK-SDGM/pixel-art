@@ -28,6 +28,9 @@ input, button, pre {
 
 pre {
   margin: 0;
+  max-width: 15rem;
+  max-height: 20rem;
+  overflow-y: auto;
 }
 
 #img-preview {
@@ -57,6 +60,12 @@ pre {
   <button id="send-compiled">Send compiled instructions</button>
   <label for="toggle-display">Display compiled instructions</label>
   <input type="checkbox" id="toggle-display" />
+</div>
+<div>
+  <label for="releasedHeight">Released height:</label>
+  <input type="number" id="releasedHeight" placeholder="Released height" value="10" />
+  <label for="compressedHeight">Compressed height:</label>
+  <input type="number" id="compressedHeight" placeholder="Compressed height" value="3" />
 </div>
 <pre id="compiled-instructions" style="display: none;"></pre>
 <div>
@@ -196,6 +205,12 @@ document.getElementById("submit").addEventListener("click", async () => {
   // writer.releaseLock();
 });
 
+document.getElementById("manual-code").addEventListener("keydown", function (ev) {
+  if (ev.key == "Enter") {
+    document.getElementById("submit").click();
+  };
+});
+
 document.getElementById("toggle-display").addEventListener("click", () => {
   let el = document.getElementById("compiled-instructions");
 
@@ -253,8 +268,16 @@ document.getElementById("preview-btn").addEventListener("click", () => {
   ctx.putImageData(imgData, 0, 0);
 });
 
+document.getElementById("palette").addEventListener("keydown", function (ev) {
+  if (ev.key == "Enter") {
+    document.getElementById("preview-btn").click();
+  };
+});
+
 document.getElementById("compile").addEventListener("click", () => {
-  let output = "G28\nG1 X155 Y105 Z5\n";
+  let releasedHeight = document.getElementById("releasedHeight").value;
+  let compressedHeight = document.getElementById("compressedHeight").value;
+  let output = `G28\nG1 X155 Y105 Z${releasedHeight}\n`;// Locate the centre point first
   let rawMatrix = document.getElementById("matrix").value;
   let width = parseInt(rawMatrix.slice(0, 2), 16);
   let height = parseInt(rawMatrix.slice(2, 4), 16);
@@ -271,10 +294,19 @@ document.getElementById("compile").addEventListener("click", () => {
     let materialYCoord = parseInt(matrix[index], 36) * 10 + 50;
     let targetXCoord = 100 + 5 * xCoord;
     let targetYCoord = 50 + 5 * yCoord;
-    output += `G1 X280 Y${materialYCoord}\nG1 X${targetXCoord} Y${targetYCoord}\n`;
+    output += `G1 X280 Y${materialYCoord} Z${releasedHeight}\n`; // go take the material
+	output += `G1 Z${compressedHeight}\n`;
+	output += `G1 X${targetXCoord} Y${targetYCoord} Z${compressedHeight}\n`; // drag
+	output += `G1 Z${releasedHeight}\n`;
   }
 
   document.getElementById("compiled-instructions").textContent = output;
+});
+
+document.getElementById("matrix").addEventListener("keydown", function (ev) {
+  if (ev.key == "Enter") {
+    document.getElementById("compile").click();
+  };
 });
 
 let saveFile = (blob, filename = "") => {
