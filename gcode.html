@@ -69,14 +69,14 @@ pre {
 </div>
 <div>
   <label for="pixelSize">Pixel size:</label>
-  <input type="number" id="pixelSize" placeholder="Pixel size" value="5" />
+  <input type="number" id="pixelSize" placeholder="Pixel size" value="10" />
   Origin:
   <input type="number" id="originX" placeholder="X" value="100" />
   <input type="number" id="originY" placeholder="Y" value="50" />
 </div>
 <div>
   <label for="materialXOrigin">Material X origin:</label>
-  <input type="number" id="materialXOrigin" placeholder="Material X origin" value="280" />
+  <input type="number" id="materialXOrigin" placeholder="Material X origin" value="260" />
 </div>
 <div>
   <label for="materialYOrigin">Material Y origin:</label>
@@ -84,7 +84,7 @@ pre {
 </div>
 <div>
   <label for="maxMaterialChamberSize">Max material chamber size:</label>
-  <input type="number" id="maxMaterialChamberSize" placeholder="Max material chamber size" value="4" />
+  <input type="number" id="maxMaterialChamberSize" placeholder="Max material chamber size" value="6" />
 </div>
 <div>
   Treat colour # <input type="number" id="transparentColourIndex" /> as transparent
@@ -99,6 +99,10 @@ pre {
   <input type="number" id="baud-rate" value="115200" placeholder="Baud rate" />
   <button id="connect">Connect</button>
   <button id="disconnect" hidden>Disconnect</button>
+</div>
+<div>
+  <label for="sleepInterval">Sleep interval:</label>
+  <input type="number" id="sleepInterval" placeholder="Sleep interval" value="15" />
 </div>
 <div>
   <input type="text" id="manual-code" placeholder="Send G-codes manually ..." />
@@ -163,6 +167,8 @@ navigator.serial.addEventListener("disconnect", () => {
 
 // Send a compiled G-code file to serial
 document.getElementById("sendFile").addEventListener("click", async () => {
+  let sleepInterval = document.getElementById("sleepInterval").value;
+
   // Split the input file into chunks of 8 lines
   let stringArray = (await file.text()).match(/(.*(?:\n|$)){8}/g) || []; // Returns null if no match, so use || []
   let blobs = stringArray.map(line => new Blob([line]));
@@ -170,8 +176,8 @@ document.getElementById("sendFile").addEventListener("click", async () => {
   try {
     for (let i = 0; i < blobs.length; i++) {
       await writer.write(await blobs[i].arrayBuffer());
-      console.warn(`Sending chunk #${i}. Sleeping for 15 seconds.`);
-      await sleep(15000);
+      console.warn(`Sending chunk #${i}. Sleeping for ${sleepInterval} seconds.`);
+      await sleep(sleepInterval * 1000);
     };
   } catch (err) {
     console.error(err);
@@ -180,6 +186,8 @@ document.getElementById("sendFile").addEventListener("click", async () => {
 });
 
 document.getElementById("send-compiled").addEventListener("click", async () => {
+  let sleepInterval = document.getElementById("sleepInterval").value;
+
   // Split the input file into chunks of 8 lines
   let stringArray = document.getElementById("compiled-instructions").textContent.match(/(.*(?:\n|$)){8}/g) || []; // Returns null if no match, so use || []
   let blobs = stringArray.map(line => new Blob([line]));
@@ -193,8 +201,8 @@ document.getElementById("send-compiled").addEventListener("click", async () => {
 
     for (let i = 0; i < blobs.length; i++) {
       await writer.write(await blobs[i].arrayBuffer());
-      console.warn(`Sending chunk #${i}. Sleeping for 15 seconds.`);
-      await sleep(15000);
+      console.warn(`Sending chunk #${i}. Sleeping for ${sleepInterval} seconds.`);
+      await sleep(sleepInterval * 1000);
     };
   } catch (err) {
     console.error(err);
