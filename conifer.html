@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conifer mass converter</title>
+<style>
+* {
+  font-family: sans-serif;
+}
+
+@media (prefers-color-scheme: light) {
+  body {
+    background: white;
+    color: black;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #17141d;
+    color: #c5c5c5;
+  }
+}
+
+input, button {
+  font-size: 1rem;
+}
+</style>
+</head>
+<body>
+<div style="display: flex; flex-direction: column; align-items: center;">
+  <input type="file" id="uploadInput" accept="image/*" multiple>
+  <div id="errorMessage"></div>
+  <div>
+    <label for="append-mode">Append to existing encoded string</label>
+    <input type="checkbox" id="append-mode">
+  </div>
+  <div id="encoded-slice-option-container">
+    <p>Encoded string slice options:</p>
+    <div style="display: flex; flex-direction: row;">
+      <label for="encoded-slice-start">Start index:</label>
+      <input type="text" id="encoded-slice-start" value="4">
+    </div>
+    <div style="display: flex; flex-direction: row;">
+      <label for="encoded-slice-end">End index:</label>
+      <input type="text" id="encoded-slice-end" value="7964">
+    </div>
+  </div>
+  <div style="display: flex; flex-direction: column; align-items: center;">
+    <label for="encoded">Encoded string:</label>
+    <div id="encoded" style="font-family: monospace; font-size: 1rem; max-width: 70vw; max-height: 5rem; overflow-x: hidden; overflow-wrap: anywhere; border: 2px solid #ccc; border-radius: 10px; padding: 0.25rem;"></div>
+  </div>
+  <div id="binary-slice-option-container">
+    <p>Binary file slice options:</p>
+    <div style="display: flex; flex-direction: row;">
+      <label for="binary-slice-start">Start index:</label>
+      <input type="text" id="binary-slice-start">
+    </div>
+    <div style="display: flex; flex-direction: row;">
+      <label for="binary-slice-end">End index:</label>
+      <input type="text" id="binary-slice-end">
+    </div>
+  </div>
+  <div id="download-binary-container">
+    <input type="text" id="download-binary-filename" placeholder="Filename">
+    <button id="download-binary">Download binary file</button>
+  </div>
+  <div>
+    <a href="index.html">Return to Homepage</a>
+  </div>
+</div>
+<script>
+"use strict";
+const coniferPalette = [0, 11141120, 43520, 11162880, 170, 11141290, 43690, 11184810, 5592405, 16733525, 5635925, 16777045, 5592575, 16733695, 5636095, 16777215];
+const errorMessage = document.getElementById("errorMessage");
+let encodedString = "";
+
+let findIndexOfSmallestElement = function (arr) {
+  if (arr.length === 0) {
+    return -1; // Return -1 if the array is empty
+  }
+  const minIndex = arr.reduce((minIndex, currentElement, currentIndex, array) => {
+    return currentElement < array[minIndex] ? currentIndex : minIndex;
+  }, 0);
+  return minIndex;
+};
+
+function clearErrorMessage(el = errorMessage) {
+  el.textContent = "";
+}
+
+function displayErrorMessage(message, el = errorMessage) {
+  el.textContent = message;
+  console.error(message);
+}
+
+let renderImage = async function (file) {
+  const bmp = await createImageBitmap(file);
+  let cnv = document.createElement("canvas");
+  cnv.width = bmp.width;
+  cnv.height = bmp.height;
+  let ctx = cnv.getContext("2d");
+  ctx.drawImage(bmp, 0, 0);
+
+  let imgData = ctx.getImageData(0, 0, bmp.width, bmp.height);
+  let resizedImgData = await resizeImage(imgData);
+  resizedImgData = quantizeData(resizedImgData, coniferPalette);
+
+  self.imgData = imgData; // For debug
+  self.resizedImgData = resizedImgData;
+
+  encodeString(document.getElementById("encoded")); // Generate string
+
+  clearErrorMessage(); // Clear any previous error message
+};
+
+document.getElementById("uploadInput").addEventListener("change", async (ev) => {
+  const files = Array.from(ev.target.files);
+
+  if (files.length > 1) {
+    document.getElementById("append-mode").checked = true;
+  };
+
+  for (const fileId in files) {
+    const file = files[fileId];
+    if (file && file.type.match("image.*")) {
+      await renderImage(file);
+    } else {
+      displayErrorMessage(`File #${fileId} is not a valid image file.`);
+    }
+  }
+});
+
+async function resizeImage(imgData) {
+  const width = 160, height = 50;
+
+  const cnv = document.createElement("canvas");
+  const ctx = cnv.getContext("2d");
+  cnv.width = imgData.width;
+  cnv.height = imgData.height;
+  ctx.putImageData(imgData, 0, 0);
+  ctx.drawImage(cnv, 0, 0, width, height);
+
+  return ctx.getImageData(0, 0, width, height);
+}
+
+function quantizeData (imgData, palette) {
+  if (!document.getElementById("append-mode").checked)
+    encodedString = "";
+
+  let newEncodedString = "";
+
+  let newImgDataArray = new Uint8ClampedArray(imgData.data.length);
+
+  let distance = function (a, b) {
+    let x = (a >> 16) - (b >> 16);
+    let y = (a >> 8 & 255) - (b >> 8 & 255);
+    let z = (a & 255) - (b & 255);
+    return x * x + y * y + z * z;
+  };
+  let findMin = function (arr, key) {
+    let keyArr = arr.map(key);
+    let minIndex = findIndexOfSmallestElement(keyArr);
+    return arr[minIndex];
+  };
+
+  let totalTimePass = 0, totalIterations = 0;
+
+  for (let y = 0; y < imgData.height; y++) {
+    for (let x = 0; x < imgData.width; x++) {
+      let startTime = performance.now();
+      let pixelIndex = (y * imgData.width + x) << 2;
+      let oldColour = (imgData.data[pixelIndex] << 16)
+        + (imgData.data[pixelIndex + 1] << 8)
+        + imgData.data[pixelIndex + 2]; // Get the colour of the current pixel
+
+      let closestColour;
+      closestColour = findMin(palette, (c) => distance(c, oldColour)); // Find the closest color in the palette
+      newEncodedString = newEncodedString.concat(palette.indexOf(closestColour).toString(36));
+      totalTimePass += performance.now() - startTime;
+      totalIterations ++;
+
+      let error;
+      let errorArray = new Uint8ClampedArray(3);
+
+      newImgDataArray[pixelIndex] = closestColour >> 16; // Set the new pixel colour in the new image
+      newImgDataArray[pixelIndex + 1] = closestColour >> 8 & 255;
+      newImgDataArray[pixelIndex + 2] = closestColour & 255;
+      newImgDataArray[pixelIndex + 3] = imgData.data[pixelIndex + 3]; // Put the original alpha values onto the new iamge data
+    }
+  }
+  console.debug(`${totalIterations} iterations passed spanning ${totalTimePass} ms. ${totalTimePass / totalIterations} ms on average.`);
+
+  // Verify Conifer header
+  if (newEncodedString.slice(0, 4) != "087f") {
+    console.warn(`Warning: Invalid Conifer header: ${newEncodedString.slice(0, 4)}`);
+    displayErrorMessage(`Invalid Conifer header: ${newEncodedString.slice(0, 4)}`);
+  }
+
+  // Apply slicing on the encoded string
+  if (document.getElementById("encoded-slice-end").value) {
+    newEncodedString = newEncodedString.slice(document.getElementById("encoded-slice-start").value, document.getElementById("encoded-slice-end").value);
+  } else {
+    newEncodedString = newEncodedString.slice(document.getElementById("encoded-slice-start").value);
+  }
+  encodedString += newEncodedString;
+
+  let newImgData = new ImageData(imgData.width, imgData.height);
+  newImgData.data.set(newImgDataArray);
+  return newImgData;
+}
+
+function encodeString(el = document.getElementById("encoded")) {
+  el.textContent = encodedString;
+}
+
+document.getElementById("download-binary").addEventListener("click", () => {
+  let arr;
+
+  if (document.getElementById("palette").children.length < 18) {
+    arr = new Uint8Array(encodedString.length >> 1);
+    encodedString.match(/.{1,2}/g).forEach((e, i) => {
+      arr[i] = parseInt(e, 16);
+    });
+  } else if (document.getElementById("palette").children.length < 4) {
+    let arr = new Uint8Array(encodedString.length >> 3);
+    encodedString.match(/.{1,8}/g).forEach((e, i) => {
+      arr[i] = parseInt(e, 2);
+    });
+  } else {
+    return;
+  }
+
+  if (document.getElementById("binary-slice-end").value) {
+    arr = arr.subarray(document.getElementById("binary-slice-start").value, document.getElementById("binary-slice-end").value);
+  } else {
+    arr = arr.subarray(document.getElementById("binary-slice-start").value);
+  }
+
+  saveFile(new Blob([arr]), document.getElementById("download-binary-filename").value);
+});
+
+let saveFile = (blob, filename = "") => {
+  const a = document.createElement("a");
+  a.download = filename;
+  a.href = URL.createObjectURL(blob);
+  a.addEventListener("click", () => {
+    setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+  });
+  a.click();
+};
+</script>
+</body>
+</html>
