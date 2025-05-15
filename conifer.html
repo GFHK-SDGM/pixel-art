@@ -218,19 +218,10 @@ function encodeString(el = document.getElementById("encoded")) {
 document.getElementById("download-binary").addEventListener("click", () => {
   let arr;
 
-  if (document.getElementById("palette").children.length < 18) {
-    arr = new Uint8Array(encodedString.length >> 1);
-    encodedString.match(/.{1,2}/g).forEach((e, i) => {
-      arr[i] = parseInt(e, 16);
-    });
-  } else if (document.getElementById("palette").children.length < 4) {
-    let arr = new Uint8Array(encodedString.length >> 3);
-    encodedString.match(/.{1,8}/g).forEach((e, i) => {
-      arr[i] = parseInt(e, 2);
-    });
-  } else {
-    return;
-  }
+  arr = new Uint8Array(encodedString.length >> 1);
+  encodedString.match(/.{1,2}/g).forEach((e, i) => {
+    arr[i] = parseInt(e, 16);
+  });
 
   if (document.getElementById("binary-slice-end").value) {
     arr = arr.subarray(document.getElementById("binary-slice-start").value, document.getElementById("binary-slice-end").value);
